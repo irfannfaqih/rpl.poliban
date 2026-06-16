@@ -162,7 +162,7 @@ export default function ProfilPimpinan() {
             <div className="relative mx-auto h-24 w-24 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 flex items-center justify-center text-3xl font-bold mb-4 group overflow-hidden">
               {me.photo ? (
                 <img
-                  src={`http://127.0.0.1:8000/storage/${me.photo}`}
+                  src={`/storage/${me.photo}`}
                   alt="Profil"
                   className="h-full w-full object-cover"
                 />

@@ -106,7 +106,7 @@ export default function SectionA() {
             <div className="h-32 w-32 rounded-2xl bg-muted overflow-hidden border-2 border-border relative flex items-center justify-center">
               {data.pasFoto ? (
                 <div className="relative h-full w-full">
-                  <img src={`http://127.0.0.1:8000/storage/${data.pasFoto}`} alt="Profile" className="h-full w-full object-cover" />
+                  <img src={`/storage/${data.pasFoto}`} alt="Profile" className="h-full w-full object-cover" />
                   <div className="absolute bottom-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <CheckCircle2 className="h-4 w-4" />
                   </div>

@@ -196,7 +196,7 @@ function PemohonSidebar() {
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold overflow-hidden">
             {user?.photo ? (
-              <img src={`http://127.0.0.1:8000/storage/${user.photo}`} alt="Profile" className="h-full w-full object-cover" />
+              <img src={`/storage/${user.photo}`} alt="Profile" className="h-full w-full object-cover" />
             ) : (
               namaLengkap?.charAt(0)?.toUpperCase() || "P"
             )}

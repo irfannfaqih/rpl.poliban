@@ -159,7 +159,7 @@ export default function ProfilAsesor() {
           <div className="bg-card rounded-2xl border shadow-sm p-6 text-center">
             <div className="relative mx-auto h-24 w-24 rounded-full bg-primary/10 text-primary flex items-center justify-center text-3xl font-bold mb-4 group overflow-hidden">
               {me.photo ? (
-                <img src={`http://127.0.0.1:8000/storage/${me.photo}`} alt="Profile" className="h-full w-full object-cover" />
+                <img src={`/storage/${me.photo}`} alt="Profile" className="h-full w-full object-cover" />
               ) : (
                 me.nama.charAt(0)
               )}
