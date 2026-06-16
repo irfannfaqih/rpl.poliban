@@ -9,7 +9,7 @@ use Throwable;
 class ErrorReporter
 {
     public function __construct(
-        private ExternalErrorTracker $externalTracker,
+        private ?ExternalErrorTracker $externalTracker = null,
     ) {}
 
     public function report(Throwable $exception, array $context = []): void
@@ -23,6 +23,19 @@ class ErrorReporter
         ];
 
         Log::error('application_exception', $context);
-        $this->externalTracker->report($exception, $context);
+        $this->resolveExternalTracker()->report($exception, $context);
+    }
+
+    private function resolveExternalTracker(): ExternalErrorTracker
+    {
+        if ($this->externalTracker instanceof ExternalErrorTracker) {
+            return $this->externalTracker;
+        }
+
+        if (app()->bound(ExternalErrorTracker::class)) {
+            return app(ExternalErrorTracker::class);
+        }
+
+        return new NullExternalErrorTracker();
     }
 }
