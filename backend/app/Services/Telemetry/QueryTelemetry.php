@@ -2,6 +2,7 @@
 
 namespace App\Services\Telemetry;
 
+use App\Support\RuntimeContext;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Log;
 
@@ -33,8 +34,8 @@ class QueryTelemetry
         Log::channel(config('observability.metrics_channel'))->warning('slow_query', [
             'duration_ms' => round($query->time, 2),
             'connection' => $query->connectionName,
-            'endpoint' => request()?->route()?->uri(),
-            'method' => request()?->method(),
+            'endpoint' => RuntimeContext::routeUri(),
+            'method' => RuntimeContext::method(),
             'sql' => $query->sql,
         ]);
     }

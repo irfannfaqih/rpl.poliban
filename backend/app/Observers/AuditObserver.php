@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\AuditLog;
+use App\Support\RuntimeContext;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -15,7 +16,7 @@ class AuditObserver
     {
         Log::info("AUDIT: Created " . class_basename($model) . " ID: " . $model->id, [
             'data' => $model->toArray(),
-            'user_id' => auth()->id() ?? 'system'
+            'user_id' => RuntimeContext::userId() ?? 'system'
         ]);
 
         $this->writeAuditLog('CREATE', $model);
@@ -29,7 +30,7 @@ class AuditObserver
         Log::info("AUDIT: Updated " . class_basename($model) . " ID: " . $model->id, [
             'changes' => $model->getChanges(),
             'original' => $model->getOriginal(),
-            'user_id' => auth()->id() ?? 'system'
+            'user_id' => RuntimeContext::userId() ?? 'system'
         ]);
 
         $changedFields = collect(array_keys($model->getChanges()))
@@ -47,7 +48,7 @@ class AuditObserver
     {
         Log::info("AUDIT: Deleted " . class_basename($model) . " ID: " . $model->id, [
             'data' => $model->toArray(),
-            'user_id' => auth()->id() ?? 'system'
+            'user_id' => RuntimeContext::userId() ?? 'system'
         ]);
 
         $this->writeAuditLog('DELETE', $model);
@@ -71,14 +72,14 @@ class AuditObserver
             };
 
             AuditLog::create([
-                'user_id' => auth()->id(),
+                'user_id' => RuntimeContext::userId(),
                 'impersonated_by' => app()->bound('session')
                     ? session('impersonator_id')
                     : null,
                 'action' => $action,
                 'module' => $module,
                 'detail' => $detail,
-                'ip_address' => request()->ip() ?: '127.0.0.1',
+                'ip_address' => RuntimeContext::ipAddress(),
                 'created_at' => now(),
             ]);
         } catch (Throwable $e) {

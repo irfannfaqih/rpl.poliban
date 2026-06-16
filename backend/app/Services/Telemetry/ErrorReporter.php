@@ -3,6 +3,7 @@
 namespace App\Services\Telemetry;
 
 use App\Contracts\ExternalErrorTracker;
+use App\Support\RuntimeContext;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -17,9 +18,9 @@ class ErrorReporter
         $context += [
             'exception' => $exception::class,
             'message' => $exception->getMessage(),
-            'endpoint' => request()?->route()?->uri(),
-            'method' => request()?->method(),
-            'user_id' => auth()->id(),
+            'endpoint' => RuntimeContext::routeUri(),
+            'method' => RuntimeContext::method(),
+            'user_id' => RuntimeContext::userId(),
         ];
 
         Log::error('application_exception', $context);
