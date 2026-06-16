@@ -9,8 +9,16 @@ class EvaluasiDiri extends Model
     protected $table = 'evaluasi_diri';
 
     protected $fillable = [
-        'pendaftaran_id', 'cpmk_id', 'profisiensi',
+        'pendaftaran_id', 'cpmk_id', 'profisiensi', 'dokumen_pendukung',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'profisiensi'       => 'string',
+            'dokumen_pendukung' => 'array',
+        ];
+    }
 
     public function pendaftaran()
     {
@@ -22,8 +30,5 @@ class EvaluasiDiri extends Model
         return $this->belongsTo(Cpmk::class);
     }
 
-    public function dokumenPendukung()
-    {
-        return $this->belongsToMany(Dokumen::class, 'evaluasi_diri_dokumen');
-    }
+
 }

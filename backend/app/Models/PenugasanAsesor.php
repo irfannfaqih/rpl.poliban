@@ -9,7 +9,7 @@ class PenugasanAsesor extends Model
     protected $table = 'penugasan_asesor';
 
     protected $fillable = [
-        'pendaftaran_id', 'asesor_id', 'urutan', 'status',
+        'pendaftaran_id', 'asesor_id', 'urutan', 'status', 'butuh_at2',
     ];
 
     public function pendaftaran()
@@ -42,8 +42,5 @@ class PenugasanAsesor extends Model
         return $this->hasMany(PemetaanMk::class);
     }
 
-    public function ujianTulisSoal()
-    {
-        return $this->hasMany(UjianTulisSoal::class);
-    }
+
 }

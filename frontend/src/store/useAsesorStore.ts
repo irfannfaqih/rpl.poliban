@@ -1,21 +1,27 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+/**
+ * useAsesorStore
+ *
+ * Store ini hanya menyimpan UI state lokal asesor — khususnya
+ * draft Form 02 (Pra-Asesmen) yang sedang diisi tapi belum di-save ke server.
+ *
+ * Data seperti daftar tugas, info pendaftaran, dll TIDAK disimpan di sini.
+ * Semua data server diambil langsung via React Query di masing-masing page/component.
+ *
+ * Sebelumnya store ini punya mockTugasList dan hardcoded asesorInfo —
+ * keduanya sudah dihapus agar tidak ada data palsu di production.
+ */
 
-export type AsesorStatus = 'Belum Dinilai' | 'Sedang Dinilai' | 'Submit Final';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
-export interface TugasAsesmen {
-  id: string; // ID Penugasan
-  pemohonId: string;
-  namaPemohon: string;
-  asalPt: string;
-  prodi: string;
-  tanggalMasuk: string;
-  status: AsesorStatus;
-}
+// ── Types ──────────────────────────────────────────────────────────────────
 
-// Form 02
-export interface PraAsesmenData {
-  isSubmitted: boolean;
+/**
+ * Draft lokal Form 02 per ID penugasan.
+ * Disimpan di sessionStorage agar tidak hilang saat user refresh halaman,
+ * tapi otomatis bersih saat tab ditutup.
+ */
+export interface PraAsesmenDraft {
   langkah1: boolean;
   langkah2: boolean;
   langkah3: boolean;
@@ -26,52 +32,11 @@ export interface PraAsesmenData {
   langkah8: boolean;
   catatanObservasi: string;
   kebutuhanKhusus: string;
-  rekomendasi: 'Lanjut Penuh' | 'Lanjut dengan Catatan' | 'Tidak Memenuhi Syarat' | null;
+  rekomendasi: "lanjut_penuh" | "lanjut_catatan" | "tidak_memenuhi" | null;
   catatanRekomendasi: string;
 }
 
-interface AsesorState {
-  asesorInfo: {
-    id: string;
-    nama: string;
-    nip: string;
-    jabatan: string;
-  } | null;
-  tugasList: TugasAsesmen[];
-  
-  // Keyed by pemohonId
-  praAsesmenData: Record<string, PraAsesmenData>;
-  
-  // Actions
-  setAsesorInfo: (info: AsesorState['asesorInfo']) => void;
-  updatePraAsesmen: (pemohonId: string, data: Partial<PraAsesmenData>) => void;
-  submitPraAsesmen: (pemohonId: string) => void;
-  updateStatusTugas: (pemohonId: string, status: AsesorStatus) => void;
-}
-
-const mockTugasList: TugasAsesmen[] = [
-  {
-    id: "TGS-001",
-    pemohonId: "PMH-001",
-    namaPemohon: "Pemohon Demo",
-    asalPt: "Universitas Contoh",
-    prodi: "D4 Sistem Informasi Kota Cerdas",
-    tanggalMasuk: "2026-05-01",
-    status: "Belum Dinilai"
-  },
-  {
-    id: "TGS-002",
-    pemohonId: "PMH-002",
-    namaPemohon: "Budi Santoso",
-    asalPt: "Politeknik Dummy",
-    prodi: "D4 Sistem Informasi Kota Cerdas",
-    tanggalMasuk: "2026-05-02",
-    status: "Sedang Dinilai"
-  }
-];
-
-const initialPraAsesmen: PraAsesmenData = {
-  isSubmitted: false,
+const emptyDraft: PraAsesmenDraft = {
   langkah1: false,
   langkah2: false,
   langkah3: false,
@@ -83,63 +48,54 @@ const initialPraAsesmen: PraAsesmenData = {
   catatanObservasi: "",
   kebutuhanKhusus: "",
   rekomendasi: null,
-  catatanRekomendasi: ""
+  catatanRekomendasi: "",
 };
+
+// ── State & Actions ────────────────────────────────────────────────────────
+
+interface AsesorState {
+  /** Draft Form 02 per ID penugasan (bukan per pemohon — pakai ID penugasan) */
+  praAsesmenDrafts: Record<string, PraAsesmenDraft>;
+
+  updateDraft: (tugasId: string, data: Partial<PraAsesmenDraft>) => void;
+  clearDraft: (tugasId: string) => void;
+  clearAllDrafts: () => void;
+  getDraft: (tugasId: string) => PraAsesmenDraft;
+}
+
+// ── Store ──────────────────────────────────────────────────────────────────
 
 export const useAsesorStore = create<AsesorState>()(
   persist(
     (set, get) => ({
-      asesorInfo: {
-        id: "ASR-001",
-        nama: "Dr. Asesor Satu, M.Kom",
-        nip: "198001012005011001",
-        jabatan: "Lektor Kepala"
-      },
-      tugasList: mockTugasList,
-      praAsesmenData: {},
+      praAsesmenDrafts: {},
 
-      setAsesorInfo: (info) => set({ asesorInfo: info }),
-      
-      updatePraAsesmen: (pemohonId, data) => 
-        set((state) => {
-          const current = state.praAsesmenData[pemohonId] || { ...initialPraAsesmen };
-          return {
-            praAsesmenData: {
-              ...state.praAsesmenData,
-              [pemohonId]: { ...current, ...data }
-            }
-          };
-        }),
-
-      submitPraAsesmen: (pemohonId) =>
-        set((state) => {
-          const current = state.praAsesmenData[pemohonId] || { ...initialPraAsesmen };
-          
-          // Update task status to "Sedang Dinilai" if it was "Belum Dinilai"
-          const updatedTugasList = state.tugasList.map(t => 
-            t.pemohonId === pemohonId && t.status === "Belum Dinilai"
-              ? { ...t, status: "Sedang Dinilai" as AsesorStatus }
-              : t
-          );
-
-          return {
-            praAsesmenData: {
-              ...state.praAsesmenData,
-              [pemohonId]: { ...current, isSubmitted: true }
-            },
-            tugasList: updatedTugasList
-          };
-        }),
-        
-      updateStatusTugas: (pemohonId, status) => 
+      updateDraft: (tugasId, data) =>
         set((state) => ({
-          tugasList: state.tugasList.map(t => 
-            t.pemohonId === pemohonId ? { ...t, status } : t
-          )
-        }))
+          praAsesmenDrafts: {
+            ...state.praAsesmenDrafts,
+            [tugasId]: {
+              ...(state.praAsesmenDrafts[tugasId] ?? emptyDraft),
+              ...data,
+            },
+          },
+        })),
+
+      clearDraft: (tugasId) =>
+        set((state) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [tugasId]: _removed, ...rest } = state.praAsesmenDrafts;
+          return { praAsesmenDrafts: rest };
+        }),
+
+      clearAllDrafts: () => set({ praAsesmenDrafts: {} }),
+
+      getDraft: (tugasId) =>
+        get().praAsesmenDrafts[tugasId] ?? { ...emptyDraft },
     }),
     {
-      name: 'asesor-storage',
-    }
-  )
+      name: "asesor-storage",
+      storage: createJSONStorage(() => sessionStorage),
+    },
+  ),
 );

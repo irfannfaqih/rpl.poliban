@@ -8,8 +8,9 @@ import {
   XCircle,
   FileText,
   Stamp,
-  Users,
-  Filter
+  Filter,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,44 +30,102 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-const mockKandidatSk = [
-  { id: "RPL-2026-001", nama: "Ahmad Fauzi", prodi: "TI-D3", sksDiakui: 45, status: "menunggu_sk" },
-  { id: "RPL-2026-003", nama: "Budi Santoso", prodi: "TI-D3", sksDiakui: 30, status: "menunggu_sk" },
-  { id: "RPL-2026-015", nama: "Siti Aminah", prodi: "TM-D3", sksDiakui: 28, status: "menunggu_sk" },
-  { id: "RPL-2026-042", nama: "Dewi Lestari", prodi: "AB-D4", sksDiakui: 55, status: "sk_terbit" },
-  { id: "RPL-2026-050", nama: "Rahmat Hidayat", prodi: "SI-D3", sksDiakui: 0, status: "ditolak" },
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { toast } from "sonner";
+import { Label } from "@/components/ui/label";
 
 export default function PenerbitanSKPage() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [nomorSkInput, setNomorSkInput] = useState("");
 
-  const filteredKandidat = mockKandidatSk.filter(k => {
-    const matchSearch = k.nama.toLowerCase().includes(searchTerm.toLowerCase()) || k.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchStatus = statusFilter === "all" || k.status === statusFilter;
-    return matchSearch && matchStatus;
+  const { data: skList = [], isLoading, error } = useQuery({
+    queryKey: ["pimpinan-sk-list", statusFilter],
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (statusFilter !== "all") {
+        params.status = statusFilter;
+      }
+      const { data } = await api.get("/pimpinan/sk", { params });
+      return data.data || [];
+    }
   });
 
-  const waitingCount = mockKandidatSk.filter(k => k.status === "menunggu_sk").length;
+  const filteredKandidat = skList.filter((k: any) => {
+    const nama = k.pendaftaran?.user?.nama || "";
+    const regNo = k.pendaftaran?.nomor_pendaftaran || "";
+    const matchSearch = nama.toLowerCase().includes(searchTerm.toLowerCase()) || regNo.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchSearch;
+  });
+
+  const waitingCount = skList.filter((k: any) => k.status === "menunggu_sk").length;
+  const publishedCount = skList.filter((k: any) => k.status === "sk_terbit").length;
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === filteredKandidat.filter(k => k.status === "menunggu_sk").length) {
+    const listWaiting = filteredKandidat.filter((k: any) => k.status === "menunggu_sk");
+    if (selectedIds.length === listWaiting.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredKandidat.filter(k => k.status === "menunggu_sk").map(k => k.id));
+      setSelectedIds(listWaiting.map((k: any) => k.id));
     }
   };
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = (id: number) => {
     if (selectedIds.includes(id)) {
       setSelectedIds(selectedIds.filter(i => i !== id));
     } else {
       setSelectedIds([...selectedIds, id]);
     }
   };
+
+  const publishMutation = useMutation({
+    mutationFn: async () => {
+      if (!nomorSkInput.trim()) {
+        throw new Error("Nomor SK wajib diisi!");
+      }
+      for (const skId of selectedIds) {
+        await api.post(`/pimpinan/sk/${skId}/terbitkan`, {
+          nomor_sk: nomorSkInput
+        });
+      }
+    },
+    onSuccess: () => {
+      toast.success(`Berhasil menerbitkan SK untuk ${selectedIds.length} mahasiswa!`);
+      setSelectedIds([]);
+      setNomorSkInput("");
+      setIsModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["pimpinan-sk-list"] });
+      queryClient.invalidateQueries({ queryKey: ["pimpinan-dashboard"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || err.response?.data?.message || "Gagal menerbitkan SK");
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+        <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+        <p className="text-sm text-muted-foreground animate-pulse">Memuat daftar SK keputusan...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 p-6 text-center">
+        <AlertCircle className="h-12 w-12 text-red-500" />
+        <h3 className="text-lg font-bold">Gagal Memuat Data</h3>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Terjadi kesalahan saat mengambil list SK keputusan dari server. Silakan coba kembali.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 pb-20">
@@ -90,7 +149,7 @@ export default function PenerbitanSKPage() {
             <div>
               <div className="text-blue-700 dark:text-blue-400 font-bold text-sm">SK Telah Terbit</div>
               <div className="text-3xl font-black text-blue-800 dark:text-blue-500 mt-1">
-                {mockKandidatSk.filter(k => k.status === "sk_terbit").length}
+                {publishedCount}
               </div>
             </div>
             <FileBadge className="h-10 w-10 text-blue-200 dark:text-blue-800" />
@@ -102,13 +161,16 @@ export default function PenerbitanSKPage() {
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Cari pemohon atau no pendaftaran..." 
+              placeholder="Cari pemohon..." 
               className="pl-9 bg-background h-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(val) => {
+            setStatusFilter(val || "all");
+            setSelectedIds([]);
+          }}>
             <SelectTrigger className="w-[180px] bg-background h-10">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Status SK" />
@@ -117,13 +179,15 @@ export default function PenerbitanSKPage() {
               <SelectItem value="all">Semua Status</SelectItem>
               <SelectItem value="menunggu_sk">Menunggu SK</SelectItem>
               <SelectItem value="sk_terbit">SK Terbit</SelectItem>
-              <SelectItem value="ditolak">Tidak Lolos</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <Button 
           disabled={selectedIds.length === 0}
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setNomorSkInput("");
+            setIsModalOpen(true);
+          }}
           className="w-full sm:w-auto gap-2 bg-emerald-600 text-white hover:bg-emerald-700 h-10 shadow-md font-bold"
         >
           <Stamp className="h-4 w-4" />
@@ -142,18 +206,18 @@ export default function PenerbitanSKPage() {
                     type="checkbox" 
                     className="rounded border-gray-300 w-4 h-4 text-emerald-600 focus:ring-emerald-500"
                     onChange={toggleSelectAll}
-                    checked={filteredKandidat.filter(k => k.status === "menunggu_sk").length > 0 && selectedIds.length === filteredKandidat.filter(k => k.status === "menunggu_sk").length}
+                    checked={filteredKandidat.filter((k: any) => k.status === "menunggu_sk").length > 0 && selectedIds.length === filteredKandidat.filter((k: any) => k.status === "menunggu_sk").length}
                   />
                 </th>
                 <th className="px-6 py-4 font-semibold">Nama Pemohon</th>
                 <th className="px-6 py-4 font-semibold">Prodi Tujuan</th>
                 <th className="px-6 py-4 font-semibold text-center">SKS Diakui</th>
                 <th className="px-6 py-4 font-semibold text-center">Status Keputusan</th>
-                <th className="px-6 py-4 font-semibold text-right">Berkas Laporan</th>
+                <th className="px-6 py-4 font-semibold text-right">No. SK / Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredKandidat.map((k) => (
+              {filteredKandidat.map((k: any) => (
                 <tr key={k.id} className="hover:bg-muted/10 transition-colors">
                   <td className="px-6 py-4 text-center">
                     <input 
@@ -165,14 +229,14 @@ export default function PenerbitanSKPage() {
                     />
                   </td>
                   <td className="px-6 py-4">
-                    <div className="font-bold text-foreground">{k.nama}</div>
-                    <div className="text-[11px] text-muted-foreground font-mono mt-0.5">{k.id}</div>
+                    <div className="font-bold text-foreground">{k.pendaftaran?.user?.nama || "Tidak Ditemukan"}</div>
+                    <div className="text-[11px] text-muted-foreground font-mono mt-0.5">{k.pendaftaran?.nomor_pendaftaran || `RPL-${k.pendaftaran_id}`}</div>
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-700 dark:text-slate-300">
-                    {k.prodi}
+                    {k.pendaftaran?.prodi?.nama || "-"}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-lg text-emerald-600 dark:text-emerald-500">{k.sksDiakui}</span>
+                    <span className="font-bold text-lg text-emerald-600 dark:text-emerald-500">{k.total_sks_diakui}</span>
                   </td>
                   <td className="px-6 py-4 text-center">
                     {k.status === "menunggu_sk" ? (
@@ -190,10 +254,23 @@ export default function PenerbitanSKPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-2 font-medium">
-                      <FileText className="h-4 w-4" />
-                      Lihat Hasil Pleno
-                    </Button>
+                    {k.status === "sk_terbit" ? (
+                      <span className="text-xs font-mono font-bold bg-muted px-2.5 py-1 rounded-md text-foreground border">{k.nomor_sk}</span>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="secondary"
+                        onClick={() => {
+                          setSelectedIds([k.id]);
+                          setNomorSkInput("");
+                          setIsModalOpen(true);
+                        }}
+                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 gap-1.5 font-bold text-xs"
+                      >
+                        <Stamp className="h-3.5 w-3.5" />
+                        Sahkan
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -224,19 +301,43 @@ export default function PenerbitanSKPage() {
               Tindakan ini akan meng-generate dokumen legal ber-QR Code secara massal dan status mereka akan berubah menjadi Lulus RPL.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-             <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-400">
-                Aksi ini bersifat final dan berkekuatan hukum dalam sistem akademik kampus.
+          
+          <div className="py-4 space-y-4">
+             <div className="space-y-2">
+                <Label htmlFor="nomorSk" className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Nomor SK Keputusan</Label>
+                <Input 
+                   id="nomorSk" 
+                   value={nomorSkInput}
+                   onChange={(e) => setNomorSkInput(e.target.value)}
+                   placeholder="Contoh: 123/SK/RPL/POLIBAN/2026"
+                   className="h-10 bg-background font-mono text-sm"
+                   required
+                />
+             </div>
+             
+             <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-400 leading-relaxed">
+                Aksi ini bersifat final dan berkekuatan hukum dalam sistem akademik kampus. Pastikan nomor SK yang dimasukkan telah sesuai dengan dokumen resmi.
              </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Batal</Button>
-            <Button onClick={() => {
-              // Simulate API call
-              setIsModalOpen(false);
-              setSelectedIds([]);
-            }} className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold gap-2">
-              <Stamp className="h-4 w-4" /> Sahkan SK Massal
+            <Button 
+              onClick={() => publishMutation.mutate()} 
+              disabled={!nomorSkInput.trim() || publishMutation.isPending}
+              className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold gap-2"
+            >
+              {publishMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Memproses...
+                </>
+              ) : (
+                <>
+                  <Stamp className="h-4 w-4" />
+                  Sahkan SK Massal
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

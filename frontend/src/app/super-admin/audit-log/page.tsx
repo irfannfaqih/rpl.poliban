@@ -9,6 +9,7 @@ import {
   MonitorSmartphone,
   Loader2
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -32,31 +33,25 @@ interface AuditLogItem {
 }
 
 export default function AuditLogPage() {
-  const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
-  const [loading, setLoading] = useState(true);
 
-  const fetchLogs = async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data: logs = [], isLoading: loading } = useQuery({
+    queryKey: ['audit-logs', debouncedSearch, actionFilter],
+    queryFn: async () => {
       const params: Record<string, string> = {};
-      if (searchTerm) params.search = searchTerm;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (actionFilter !== 'all') params.action = actionFilter;
       const { data: res } = await api.get('/super-admin/audit-log', { params });
-      setLogs(res.data || []);
-    } catch (err) {
-      console.error('Failed to fetch audit logs:', err);
-    } finally {
-      setLoading(false);
+      return res.data as AuditLogItem[];
     }
-  };
-
-  useEffect(() => { fetchLogs(); }, []);
-  useEffect(() => {
-    const timer = setTimeout(() => fetchLogs(), 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm, actionFilter]);
+  });
 
   const getActionBadge = (action: string) => {
     switch (action) {
@@ -87,7 +82,7 @@ export default function AuditLogPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Cari user atau detail aktivitas..." className="pl-9 bg-background h-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
-          <Select value={actionFilter} onValueChange={setActionFilter}>
+          <Select value={actionFilter} onValueChange={(val) => setActionFilter(val || "all")}>
             <SelectTrigger className="w-[150px] bg-background h-10">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Tipe Aksi" />

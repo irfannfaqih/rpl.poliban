@@ -6,11 +6,25 @@ use Illuminate\Database\Eloquent\Model;
 
 class AuditLog extends Model
 {
-    protected $table = 'audit_log';
+    protected $table = "audit_log";
     public $timestamps = false;
 
-    protected $fillable = ['user_id', 'action', 'module', 'detail', 'ip_address', 'created_at'];
-    protected function casts(): array { return ['created_at' => 'datetime']; }
+    protected $fillable = [
+        "user_id",
+        "impersonated_by",
+        "action",
+        "module",
+        "detail",
+        "ip_address",
+        "created_at",
+    ];
+    protected function casts(): array
+    {
+        return ["created_at" => "datetime"];
+    }
 
-    public function user() { return $this->belongsTo(User::class); }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

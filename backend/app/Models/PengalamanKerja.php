@@ -6,12 +6,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class PengalamanKerja extends Model
 {
-    protected $table = 'pengalaman_kerja';
+    protected $table = "pengalaman_kerja";
 
     protected $fillable = [
-        'pendaftaran_id', 'tipe', 'nama', 'jabatan_peran',
-        'bidang', 'tahun_mulai', 'tahun_selesai', 'deskripsi',
-        'sertifikat_path',
+        "pendaftaran_id",
+        "tipe",
+        "nama",
+        "jabatan_peran",
+        "status_kepegawaian",
+        "bidang",
+        "tahun_mulai",
+        "bulan_mulai",
+        "tahun_selesai",
+        "bulan_selesai",
+        "deskripsi",
+        "sertifikat_path",
     ];
 
     public function pendaftaran()

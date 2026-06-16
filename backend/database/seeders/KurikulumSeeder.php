@@ -86,6 +86,21 @@ class KurikulumSeeder extends Seeder
                 'Mampu mendesain perangkat lunak',
                 'Mampu mengimplementasikan dan menguji perangkat lunak',
             ],
+            'SI201' => [
+                'Mahasiswa mampu mengetahui, memahami, dan menjelaskan konsep dan pengertian sistem informasi dan teknologi informasi',
+                'Mahasiswa mampu mengetahui, memahami, dan menjelaskan jenis-jenis sistem informasi',
+                'Mahasiswa mampu mengetahui, memahami, dan menjelaskan pengembangan dan pengadaan sistem informasi',
+            ],
+            'SI202' => [
+                'Mampu memahami prinsip atau konsep dasar dari Internet of Things (IoT) serta arsitekturnya',
+                'Mampu memahami berbagai macam bentuk solusi dan enablers Internet of Things (IoT)',
+                'Mampu merancang, membangun, dan menerapkan pemrograman berbasis Internet of Things (IoT)',
+            ],
+            'SI203' => [
+                'Mahasiswa mampu mengetahui dan memahami konsep, teori, dan metode dari pemodelan proses bisnis',
+                'Mahasiswa mampu menjelaskan tentang bagian-bagian proses bisnis dan mampu mengimplementasikan serta menghasilkan sebuah sistem informasi',
+                'Mahasiswa mampu merancang dan menganalisis model bisnis sesuai ide dan peluang yang ada saat ini',
+            ],
         ];
 
         foreach ($cpmkData as $mkKode => $cpmkList) {

@@ -11,7 +11,7 @@ class ProdiController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Prodi::withCount('pendaftaran');
+        $query = Prodi::with('jurusanData')->withCount('pendaftaran');
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -21,9 +21,9 @@ class ProdiController extends Controller
             $query->where('status', $request->status);
         }
 
-        $data = $query->orderBy('kode')->get();
+        $data = $query->orderBy('kode')->paginate($request->get('per_page', 100));
 
-        return response()->json(['data' => $data]);
+        return response()->json($data);
     }
 
     public function store(Request $request): JsonResponse
@@ -32,7 +32,8 @@ class ProdiController extends Controller
             'kode' => 'required|string|max:10|unique:prodi,kode',
             'nama' => 'required|string|max:255',
             'jenjang' => 'required|in:D3,D4',
-            'jurusan' => 'required|string|max:100',
+            'jurusan' => 'sometimes|string|max:100',
+            'jurusan_id' => 'required|exists:jurusan,id',
             'status' => 'sometimes|in:aktif,nonaktif',
         ]);
 
@@ -46,7 +47,7 @@ class ProdiController extends Controller
 
     public function show(Prodi $prodi): JsonResponse
     {
-        return response()->json(['data' => $prodi->loadCount('pendaftaran')]);
+        return response()->json(['data' => $prodi->load(['pendaftaran', 'jurusanData'])->loadCount('pendaftaran')]);
     }
 
     public function update(Request $request, Prodi $prodi): JsonResponse
@@ -56,6 +57,7 @@ class ProdiController extends Controller
             'nama' => 'sometimes|string|max:255',
             'jenjang' => 'sometimes|in:D3,D4',
             'jurusan' => 'sometimes|string|max:100',
+            'jurusan_id' => 'sometimes|exists:jurusan,id',
             'status' => 'sometimes|in:aktif,nonaktif',
         ]);
 

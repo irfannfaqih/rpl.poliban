@@ -20,9 +20,9 @@ class GelombangController extends Controller
             $query->where('status', $request->status);
         }
 
-        $data = $query->orderByDesc('created_at')->get();
+        $data = $query->orderByDesc('created_at')->paginate($request->get('per_page', 100));
 
-        return response()->json(['data' => $data]);
+        return response()->json($data);
     }
 
     public function store(Request $request): JsonResponse

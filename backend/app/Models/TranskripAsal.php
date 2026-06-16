@@ -6,11 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class TranskripAsal extends Model
 {
-    protected $table = 'transkrip_asal';
+    protected $table = "transkrip_asal";
 
     protected $fillable = [
-        'pendaftaran_id', 'semester', 'nama_mk', 'sks',
-        'nilai_huruf', 'nilai_angka',
+        "pendaftaran_id",
+        "kode_mk",
+        "semester",
+        "nama_mk",
+        "sks",
+        "nilai_huruf",
+        "nilai_angka",
     ];
 
     public function pendaftaran()

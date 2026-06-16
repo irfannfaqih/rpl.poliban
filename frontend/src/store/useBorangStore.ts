@@ -1,27 +1,32 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { dataProdi } from '@/data/prodi';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-interface DokumenTambahan {
+export interface DokumenTambahan {
   id: string;          // "DOK-1", "DOK-2", etc.
+  dbId?: string;       // ID database setelah upload berhasil
   tipe: string;        // dari dropdown tipe dokumen
   deskripsi: string;   // deskripsi singkat oleh pemohon
   fileName: string;    // nama file yang di-upload
+  url?: string;        // URL untuk mendownload/melihat file
 }
 
-interface DokumenWajib {
+export interface DokumenWajib {
   Ijazah?: string;
+  IjazahId?: string;
+  IjazahUrl?: string;
   Transkrip?: string;
+  TranskripId?: string;
+  TranskripUrl?: string;
 }
 
 interface BorangData {
   sectionA: Record<string, string>;
   sectionB: Record<string, unknown[]>;
-  sectionC: Record<string, unknown[]>;
+  sectionC: Record<string, any>;
   sectionD: {
     evaluasi: Record<string, {
       profisiensi: 1 | 2 | 4 | 5 | null;
@@ -58,17 +63,23 @@ const initialBorangData: BorangData = {
     tempatLahir: '',
     tanggalLahir: '',
     jenisKelamin: '',
+    kebangsaan: '',
     noHP: '',
     alamat: '',
     emailPribadi: '',
     pasFoto: '', // Profile Photo
   },
-  sectionB: { 
+  sectionB: {
     items: [],
     transkrip: [],
     pelatihan: []
   },
-  sectionC: { 
+  sectionC: {
+    instansi: '',
+    pekerjaan: '',
+    alamatInstansi: '',
+    telpInstansi: '',
+    golongan: '',
     items: [],
     organisasi: [],
     penghargaan: []
@@ -76,7 +87,7 @@ const initialBorangData: BorangData = {
   sectionD: {
     evaluasi: {}
   },
-  sectionE: { 
+  sectionE: {
     dokumenWajib: {},
     dokumenTambahan: []
   }
@@ -94,7 +105,7 @@ export const useBorangStore = create<BorangState>()(
       lastSaved: null,
       touchedSections: ['sectionA'],
 
-      updateSection: (section, values) => 
+      updateSection: (section, values) =>
         set((state) => ({
           data: { ...state.data, [section]: values },
           lastSaved: new Date()
@@ -116,7 +127,7 @@ export const useBorangStore = create<BorangState>()(
       },
 
       resetBorang: () => set({ data: initialBorangData, lastSaved: null, touchedSections: ['sectionA'] }),
-      
+
       /* ------------------------------------------------------------ */
       /*  Helper: get flat list of all uploaded documents               */
       /* ------------------------------------------------------------ */
@@ -124,7 +135,7 @@ export const useBorangStore = create<BorangState>()(
         const { data } = get();
         const list: { id: string; label: string }[] = [];
         const wajib = data.sectionE.dokumenWajib || {};
-        
+
         // Ijazah & Transkrip are evidence, KTP & PasFoto are admin (not evidence)
         if (wajib.Ijazah) list.push({ id: 'Ijazah', label: 'Ijazah Terakhir' });
         if (wajib.Transkrip) list.push({ id: 'Transkrip', label: 'Transkrip Nilai' });
@@ -144,34 +155,34 @@ export const useBorangStore = create<BorangState>()(
       /* ------------------------------------------------------------ */
       validateSection: (sectionId, prodiId) => {
         const { data } = get();
-        
+
         switch (sectionId) {
           case 'sectionA': {
             const s = data.sectionA;
-            return !!(s.namaLengkap && s.nik?.length === 16 && s.tempatLahir && s.tanggalLahir && s.jenisKelamin && s.noHP && s.alamat && s.emailPribadi && s.pasFoto);
+            return !!(s.namaLengkap && s.nik?.length === 16 && s.tempatLahir && s.tanggalLahir && s.jenisKelamin && s.agama && s.kebangsaan && s.noHP && s.alamat && s.emailPribadi && s.pasFoto);
           }
 
           case 'sectionB': {
             const items = (data.sectionB.items || []) as Record<string, string>[];
             const transkrip = (data.sectionB.transkrip || []) as Record<string, string>[];
-            
+
             if (items.length === 0) return false;
-            const itemsValid = items.every((it) => 
+            const itemsValid = items.every((it) =>
               it.jenjang && it.institusi && it.tahunMasuk && it.tahunLulus &&
               it.jenjang.trim() !== "" && it.institusi.trim() !== ""
             );
             if (!itemsValid) return false;
 
             if (transkrip.length === 0) return false;
-            const transkripValid = transkrip.every((t) => 
+            const transkripValid = transkrip.every((t) =>
               t.semester && t.namaMk && t.sks && t.nilaiHuruf && t.nilaiAngka &&
-              t.semester.toString().trim() !== "" && 
+              t.semester.toString().trim() !== "" &&
               t.namaMk.trim() !== "" &&
               t.sks.toString().trim() !== "" &&
               t.nilaiHuruf.trim() !== "" &&
               t.nilaiAngka.toString().trim() !== ""
             );
-            
+
             return transkripValid;
           }
 
@@ -179,21 +190,20 @@ export const useBorangStore = create<BorangState>()(
             const items = (data.sectionC.items || []) as Record<string, string>[];
             // Opsional: Jika tidak ada item, dianggap valid
             if (items.length === 0) return true;
-            
-            return items.every((it) => 
+
+            return items.every((it) =>
               it.namaPerusahaan && it.jabatan && it.tahunMulai &&
               it.namaPerusahaan.trim() !== "" && it.jabatan.trim() !== ""
             );
           }
 
           case 'sectionD': {
-            if (!prodiId) return false;
-            const prodi = dataProdi.find(p => p.id === prodiId);
-            if (!prodi) return false;
-            const allCpmk = prodi.kurikulum.flatMap(mk => mk.cpmk);
-            if (allCpmk.length === 0) return true;
             const evaluasi = data.sectionD.evaluasi || {};
-            return allCpmk.every(c => !!evaluasi[c.id]?.profisiensi);
+            const totalCpmk = (data.sectionD as any).totalCpmk || 0;
+            if (totalCpmk === 0) return false;
+
+            const filledCount = Object.values(evaluasi).filter(e => e.profisiensi !== null).length;
+            return filledCount >= totalCpmk;
           }
 
           case 'sectionE': {

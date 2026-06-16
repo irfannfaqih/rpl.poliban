@@ -34,27 +34,14 @@ export default function SectionB() {
   const data = useBorangStore((s) => s.data.sectionB);
   const updateSection = useBorangStore((s) => s.updateSection);
 
-  const items: PendidikanItem[] = data.items || [];
+  const items: PendidikanItem[] = (data.items || []) as any[];
 
-  const transkrip: TranskripItem[] = data.transkrip || [];
-  const pelatihan: PelatihanItem[] = data.pelatihan || [];
+  const transkrip: TranskripItem[] = (data.transkrip || []) as any[];
+  const pelatihan: PelatihanItem[] = (data.pelatihan || []) as any[];
 
   const updateItem = (index: number, field: keyof PendidikanItem, value: string) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
-    updateSection("sectionB", { ...data, items: newItems });
-  };
-
-  const handleFileUpload = (index: number) => {
-    // Simulate file upload for individual education item
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], fileTranskrip: `transkrip_${index + 1}.pdf` };
-    updateSection("sectionB", { ...data, items: newItems });
-  };
-
-  const removeFile = (index: number) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], fileTranskrip: undefined };
     updateSection("sectionB", { ...data, items: newItems });
   };
 
@@ -256,9 +243,19 @@ export default function SectionB() {
               <FileText className="h-4 w-4 text-primary" />
               <h3 className="text-lg font-bold tracking-tight">Input Nilai Mata Kuliah (Manual)</h3>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-4">
               Masukkan rincian nilai mata kuliah Anda secara manual di sini. <strong className="text-foreground">Pastikan data sesuai dengan transkrip resmi yang Anda unggah di atas.</strong>
             </p>
+
+            <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-xl p-4 flex gap-3 items-start mb-6">
+              <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Informasi Khusus Lulusan SMA/SMK Sederajat</h4>
+                <p className="text-xs text-blue-800/80 dark:text-blue-400/80 leading-relaxed">
+                  Bagi pemohon lulusan SMA/SMK atau sederajat yang mendaftar menggunakan pengalaman kerja (RPL Tipe A2), bagian Transkrip dan Input Mata Kuliah ini bersifat <strong>Opsional</strong> dan dapat dikosongkan. Silakan langsung klik tombol "Simpan & Lanjutkan" di bawah.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -336,9 +333,18 @@ export default function SectionB() {
               <div className="w-full md:col-span-2">
                 <Label className="md:hidden text-xs text-muted-foreground mb-1 block">Nilai Angka</Label>
                 <Input
-                  placeholder="0-100"
+                  type="number"
+                  placeholder="0-4"
+                  min={0}
+                  max={4}
+                  step={0.01}
                   value={mk.nilaiAngka || ""}
-                  onChange={(e) => updateTranskrip(i, "nilaiAngka", e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "" || (parseFloat(val) >= 0 && parseFloat(val) <= 4)) {
+                      updateTranskrip(i, "nilaiAngka", val);
+                    }
+                  }}
                   className="h-10 font-mono text-center"
                 />
               </div>

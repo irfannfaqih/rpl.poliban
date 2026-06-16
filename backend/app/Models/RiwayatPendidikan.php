@@ -10,7 +10,7 @@ class RiwayatPendidikan extends Model
 
     protected $fillable = [
         'pendaftaran_id', 'jenjang', 'institusi', 'program_studi',
-        'tahun_masuk', 'tahun_lulus',
+        'tahun_masuk', 'tahun_lulus', 'ipk'
     ];
 
     public function pendaftaran()

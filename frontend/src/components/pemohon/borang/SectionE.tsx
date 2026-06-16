@@ -1,10 +1,13 @@
 "use client";
 
-import { useBorangStore } from "@/store/useBorangStore";
-import { UploadCloud, X, File, Plus, Info, ShieldCheck, FolderOpen } from "lucide-react";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import api from "@/lib/api";
+import { openPrivateFile, privateDocumentPath } from "@/lib/private-files";
+import { DokumenTambahan, DokumenWajib, useBorangStore } from "@/store/useBorangStore";
+import { Eye, File, FolderOpen, Info, Loader2, Plus, ShieldCheck, UploadCloud, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 /* ------------------------------------------------------------------ */
 /*  Tipe Dokumen Dropdown Options                                      */
@@ -29,28 +32,10 @@ const TIPE_DOKUMEN_OPTIONS = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Interfaces                                                         */
-/* ------------------------------------------------------------------ */
-
-interface DokumenTambahan {
-  id: string;
-  tipe: string;
-  deskripsi: string;
-  fileName: string;
-}
-
-interface DokumenWajib {
-  KTP?: string;
-  Ijazah?: string;
-  Transkrip?: string;
-  PasFoto?: string;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function SectionE() {
+export default function SectionE({ pendaftaranId }: { pendaftaranId?: number }) {
   const data = useBorangStore((s) => s.data.sectionE);
   const updateSection = useBorangStore((s) => s.updateSection);
 
@@ -58,20 +43,68 @@ export default function SectionE() {
   const dokumenTambahan: DokumenTambahan[] = data.dokumenTambahan || [];
 
   const [showGuide, setShowGuide] = useState(false);
+  const [uploadingWajib, setUploadingWajib] = useState<string | null>(null);
+  const [uploadingTambahan, setUploadingTambahan] = useState<number | null>(null);
+
+  const triggerFileUpload = (accept: string, onFileSelect: (file: File) => void) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.onchange = (e: any) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+        const isAllowedExtension = file.name.match(/\.(pdf|jpg|jpeg|png)$/i);
+
+        if (!allowedTypes.includes(file.type) && !isAllowedExtension) {
+          toast.error("Format tidak didukung. Harap unggah file berformat .pdf, .jpg, .jpeg, atau .png");
+          return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error("Ukuran file maksimal 10MB");
+          return;
+        }
+        onFileSelect(file);
+      }
+    };
+    input.click();
+  };
 
   /* ---------- Handlers: Dokumen Wajib ---------- */
 
   const handleUploadWajib = (key: keyof DokumenWajib) => {
-    // Simulasi upload file
-    const names: Record<string, string> = {
-      KTP: "KTP_scan.pdf",
-      Ijazah: "Ijazah_terakhir.pdf",
-      Transkrip: "Transkrip_nilai.pdf",
-      PasFoto: "Pas_foto.jpg",
-    };
-    updateSection("sectionE", {
-      ...data,
-      dokumenWajib: { ...dokumenWajib, [key]: names[key] || `${key}.pdf` },
+    if (!pendaftaranId) {
+      toast.error("ID Pendaftaran tidak ditemukan. Mohon refresh halaman.");
+      return;
+    }
+
+    triggerFileUpload(".pdf,.jpg,.jpeg,.png", async (file) => {
+      setUploadingWajib(key as string);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("tipe", (key as string).toLowerCase());
+        formData.append("deskripsi", "Dokumen Wajib " + (key as string));
+
+        const res = await api.post(`/pemohon/pendaftaran/${pendaftaranId}/dokumen`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        const currentState = useBorangStore.getState().data.sectionE;
+        const next = {
+          ...currentState.dokumenWajib,
+          [key]: res.data.data.file_name,
+          [`${key}Url`]: res.data.data.file_path,
+          [`${key}Id`]: res.data.data.id?.toString(),
+        };
+        updateSection("sectionE", { ...currentState, dokumenWajib: next });
+        toast.success(`Berhasil mengunggah ${key}`);
+      } catch (err: any) {
+        toast.error(`Gagal mengunggah ${key}: ` + (err.response?.data?.message || err.message));
+      } finally {
+        setUploadingWajib(null);
+      }
     });
   };
 
@@ -105,17 +138,52 @@ export default function SectionE() {
   };
 
   const updateDokumenTambahan = (index: number, field: keyof DokumenTambahan, value: string) => {
-    const updated = [...dokumenTambahan];
+    const currentState = useBorangStore.getState().data.sectionE;
+    const updated = [...currentState.dokumenTambahan];
     updated[index] = { ...updated[index], [field]: value };
-    updateSection("sectionE", { ...data, dokumenTambahan: updated });
+    updateSection("sectionE", { ...currentState, dokumenTambahan: updated });
   };
 
   const uploadDokumenTambahan = (index: number) => {
+    if (!pendaftaranId) {
+      toast.error("ID Pendaftaran tidak ditemukan. Mohon refresh halaman.");
+      return;
+    }
     const dok = dokumenTambahan[index];
-    const fileName = dok.deskripsi
-      ? `${dok.id}_${dok.deskripsi.replace(/\s+/g, "_").substring(0, 30)}.pdf`
-      : `${dok.id}_dokumen.pdf`;
-    updateDokumenTambahan(index, "fileName", fileName);
+    if (!dok.tipe || !dok.deskripsi) {
+      toast.error("Pilih tipe dokumen dan isi nama/deskripsi terlebih dahulu.");
+      return;
+    }
+
+    triggerFileUpload(".pdf,.jpg,.jpeg,.png", async (file) => {
+      setUploadingTambahan(index);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("tipe", "tambahan");
+        formData.append("deskripsi", `${dok.tipe}: ${dok.deskripsi}`);
+
+        const res = await api.post(`/pemohon/pendaftaran/${pendaftaranId}/dokumen`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        const currentState = useBorangStore.getState().data.sectionE;
+        const updated = [...currentState.dokumenTambahan];
+        updated[index] = {
+          ...updated[index],
+          fileName: res.data.data.file_name,
+          url: res.data.data.file_path,
+          // Simpan database ID agar bisa di-resolve di workspace asesor
+          dbId: res.data.data.id?.toString(),
+        };
+        updateSection("sectionE", { ...currentState, dokumenTambahan: updated });
+        toast.success(`Berhasil mengunggah dokumen tambahan`);
+      } catch (err: any) {
+        toast.error(`Gagal mengunggah dokumen: ` + (err.response?.data?.message || err.message));
+      } finally {
+        setUploadingTambahan(null);
+      }
+    });
   };
 
   const removeDokumenTambahan = (index: number) => {
@@ -159,7 +227,7 @@ export default function SectionE() {
             <p className="font-semibold text-blue-700 dark:text-blue-300">Panduan Unggah Dokumen</p>
             <p className="leading-relaxed text-foreground/80">
               Lengkapi dokumen wajib terlebih dahulu, lalu tambahkan dokumen bukti lainnya
-              yang mendukung klaim kompetensi Anda. Total dokumen terunggah: <strong>{totalUploaded}</strong>
+              yang mendukung klaim kompetensi Anda.
             </p>
 
             <button
@@ -177,7 +245,7 @@ export default function SectionE() {
                     <span className="font-bold text-blue-500 shrink-0">•</span>
                     <div>
                       <span className="font-semibold text-foreground">{opt.value}</span>
-                      <span className="text-muted-foreground"> — {opt.desc}</span>
+                      <span className="text-muted-foreground">: {opt.desc}</span>
                     </div>
                   </div>
                 ))}
@@ -212,28 +280,52 @@ export default function SectionE() {
 
                 {fileName ? (
                   <div className="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-1 min-w-0 items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/20 text-green-600 dark:text-green-400">
                         <File className="h-5 w-5" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{fileName}</p>
-                        <p className="text-xs text-green-600 dark:text-green-400">✓ Selesai diunggah</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate" title={fileName}>{fileName}</p>
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">✓ Selesai diunggah</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleRemoveWajib(slot.key)}
-                      className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {dokumenWajib[`${slot.key}Id` as keyof DokumenWajib] && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openPrivateFile(
+                              privateDocumentPath(
+                                dokumenWajib[`${slot.key}Id` as keyof DokumenWajib]!,
+                              ),
+                            )
+                          }
+                          className="rounded-full p-2 text-primary hover:bg-primary/10 transition-colors"
+                          title="Lihat Dokumen"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleRemoveWajib(slot.key)}
+                        className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        title="Hapus Dokumen"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <button
                     onClick={() => handleUploadWajib(slot.key)}
-                    className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-red-500/30 py-6 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
+                    disabled={uploadingWajib === slot.key}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-red-500/30 py-6 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-foreground disabled:opacity-50"
                   >
-                    <UploadCloud className="h-7 w-7 opacity-40" />
+                    {uploadingWajib === slot.key ? (
+                      <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                    ) : (
+                      <UploadCloud className="h-7 w-7 opacity-40" />
+                    )}
                     <div className="text-center">
                       <p className="text-sm font-medium">Klik untuk mengunggah</p>
                       <p className="text-xs">PDF, JPG, atau PNG (Maks. 5MB)</p>
@@ -296,7 +388,7 @@ export default function SectionE() {
                       onChange={(e) => updateDokumenTambahan(index, "tipe", e.target.value)}
                       className="h-9 rounded-lg border border-border bg-background text-foreground px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     >
-                      <option value="">— Pilih tipe dokumen —</option>
+                      <option value="">Pilih tipe dokumen</option>
                       {TIPE_DOKUMEN_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.value}
@@ -320,28 +412,48 @@ export default function SectionE() {
                 {/* File Upload */}
                 {dok.fileName ? (
                   <div className="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-1 min-w-0 items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/20 text-green-600 dark:text-green-400">
                         <File className="h-4 w-4" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{dok.fileName}</p>
-                        <p className="text-xs text-green-600 dark:text-green-400">✓ Selesai diunggah</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate" title={dok.fileName}>{dok.fileName}</p>
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">✓ Selesai diunggah</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => updateDokumenTambahan(index, "fileName", "")}
-                      className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {dok.dbId && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openPrivateFile(privateDocumentPath(dok.dbId!))
+                          }
+                          className="rounded-full p-1.5 text-primary hover:bg-primary/10 transition-colors"
+                          title="Lihat Dokumen"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => updateDokumenTambahan(index, "fileName", "")}
+                        className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        title="Hapus Dokumen"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <button
                     onClick={() => uploadDokumenTambahan(index)}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-5 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
+                    disabled={uploadingTambahan === index}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-5 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-foreground disabled:opacity-50"
                   >
-                    <UploadCloud className="h-5 w-5 opacity-50" />
+                    {uploadingTambahan === index ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    ) : (
+                      <UploadCloud className="h-5 w-5 opacity-50" />
+                    )}
                     <span className="text-sm font-medium">Klik untuk mengunggah file</span>
                   </button>
                 )}

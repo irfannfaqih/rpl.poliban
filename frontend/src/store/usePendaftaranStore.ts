@@ -1,77 +1,47 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+/**
+ * usePendaftaranStore
+ *
+ * Store minimal yang hanya menyimpan ID pendaftaran aktif.
+ * Semua data pendaftaran (status, jadwal, pleno, dll) diambil dari API
+ * via React Query di masing-masing page/component.
+ *
+ * Sebelumnya store ini berisi:
+ * - jadwal mock hardcoded dengan nama asesor palsu
+ * - submitPendaftaran() yang pakai setTimeout (simulasi)
+ * - simulatePayment() yang pakai setTimeout (simulasi)
+ * Semua itu sudah dihapus.
+ */
 
-type StatusAlur = 'pre_submit' | 'waiting_payment' | 'payment_verified' | 'waiting_verification' | 'pra_asesmen' | 'asesmen_tahap2' | 'pleno' | 'finished';
-
-interface JadwalAsesmen {
-  title: string;
-  date: string;
-  time: string;
-  location: string;
-  room?: string;
-  link?: string;
-  assessor: string[];
-  notes: string;
-}
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 interface PendaftaranState {
-  statusAlur: StatusAlur;
-  namaLengkap: string;
-  email: string;
+  /** ID pendaftaran aktif. null = belum punya pendaftaran. */
+  pendaftaranId: number | null;
   prodiId: string | null;
-  nomorPendaftaran: string | null;
-  jadwal: JadwalAsesmen | null;
-  setStatusAlur: (status: StatusAlur) => void;
-  setProfile: (nama: string, email: string, prodiId: string) => void;
-  submitPendaftaran: () => Promise<void>;
-  simulatePayment: () => Promise<void>;
-  setJadwal: (jadwal: JadwalAsesmen | null) => void;
+  nama: string;
+  email: string;
+
+  setPendaftaranId: (id: number | null) => void;
+  setProfile: (nama: string, email: string, prodiId: string | null) => void;
+  clearPendaftaran: () => void;
 }
 
 export const usePendaftaranStore = create<PendaftaranState>()(
   persist(
     (set) => ({
-      statusAlur: 'pre_submit',
-      namaLengkap: '',
-      email: '',
+      pendaftaranId: null,
       prodiId: null,
-      nomorPendaftaran: null,
-      jadwal: {
-        title: "Asesmen Tahap 2 (Wawancara)",
-        date: "Sabtu, 28 Oktober 2026",
-        time: "13:00 - 15:00 WITA",
-        location: "kampus POLIBAN, Gedung Elektro",
-        room: "Ruang (H-201)",
-        assessor: [
-          "Agus Setiyo Budi Nugroho, S.T., M.Kom.",
-          "Rahimi Fitri, S.Kom., M.Kom."
-        ],
-        notes: "Mohon hadir tepat waktu dan membawa dokumen portofolio asli untuk divalidasi oleh Tim Asesor."
-      },
-      setStatusAlur: (status) => set({ statusAlur: status }),
-      setProfile: (nama, email, prodiId) => set({ namaLengkap: nama, email, prodiId }),
-      setJadwal: (jadwal) => set({ jadwal }),
-      submitPendaftaran: async () => {
-        // Simulate API call for final submit
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            set({ statusAlur: 'waiting_verification' });
-            resolve();
-          }, 1500);
-        });
-      },
-      simulatePayment: async () => {
-        // Simulate API call for checking payment webhook
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            set({ statusAlur: 'payment_verified' });
-            resolve();
-          }, 1000);
-        });
-      }
+      nama: "",
+      email: "",
+
+      setPendaftaranId: (id) => set({ pendaftaranId: id }),
+      setProfile: (nama, email, prodiId) => set({ nama, email, prodiId }),
+      clearPendaftaran: () => set({ pendaftaranId: null, prodiId: null, nama: "", email: "" }),
     }),
     {
-      name: 'pendaftaran-storage',
-    }
-  )
+      name: "pendaftaran-storage",
+      storage: createJSONStorage(() => sessionStorage),
+    },
+  ),
 );

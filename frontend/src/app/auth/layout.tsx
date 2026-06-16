@@ -1,9 +1,9 @@
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { Metadata } from "next";
 import Image from "next/image";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
-  title: "Masuk — Sistem RPL POLIBAN",
+  title: "Masuk - Sistem RPL POLIBAN",
   description: "Masuk ke akun RPL POLIBAN Anda untuk melanjutkan pendaftaran.",
 };
 
@@ -27,10 +27,10 @@ export default function AuthLayout({
         <div className="relative z-10">
           <div className="flex items-center gap-3">
             <div className="relative h-10 w-10">
-              <Image 
-                src="/poliban.png" 
-                alt="Logo POLIBAN" 
-                fill 
+              <Image
+                src="/poliban.png"
+                alt="Logo POLIBAN"
+                fill
                 className="object-contain"
               />
             </div>

@@ -1,12 +1,12 @@
 "use client";
 
-import { useAsesorStore, TugasAsesmen } from "@/store/useAsesorStore";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
 import { 
   ClipboardList, 
   Search, 
   Filter, 
   ArrowRight,
-  Clock,
   CheckCircle2,
   FileClock,
   AlertCircle
@@ -14,35 +14,52 @@ import {
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  AsesorTask,
+  resolveAsesorTaskAction,
+} from "@/lib/asesor-flow";
 
 export default function AsesorDashboard() {
   const router = useRouter();
-  const tugasList = useAsesorStore((s) => s.tugasList);
-  const praAsesmenData = useAsesorStore((s) => s.praAsesmenData);
+  const { data: fetchResult, isLoading } = useQuery({
+    queryKey: ['tugas-asesor-list'],
+    queryFn: async () => {
+      const { data } = await api.get('/asesor/tugas');
+      return data.data;
+    }
+  });
+
+  const tugasList = fetchResult || [];
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("All");
 
-  const filteredTugas = tugasList.filter(t => {
-    const matchQuery = t.namaPemohon.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                       t.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchStatus = filterStatus === "All" || t.status === filterStatus;
+  const tasks = tugasList as AsesorTask[];
+
+  const filteredTugas = tasks.filter((t) => {
+    const nama = t.pendaftaran?.user?.nama || "Tanpa Nama";
+    const action = resolveAsesorTaskAction(t);
+    const matchQuery = nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                       String(t.id).includes(searchQuery.toLowerCase());
+    const matchStatus = filterStatus === "All" || action.stage === filterStatus;
     return matchQuery && matchStatus;
   });
 
-  const handleAction = (task: TugasAsesmen) => {
-    const isPraAsesmenSubmitted = praAsesmenData[task.pemohonId]?.isSubmitted;
-    
-    if (isPraAsesmenSubmitted) {
-      router.push(`/asesor/workspace?pemohonId=${task.pemohonId}`);
-    } else {
-      router.push(`/asesor/pra-asesmen?pemohonId=${task.pemohonId}`);
-    }
+  const handleAction = (task: AsesorTask) => {
+    router.push(resolveAsesorTaskAction(task).href);
   };
 
-  const statBelum = tugasList.filter(t => t.status === "Belum Dinilai").length;
-  const statSedang = tugasList.filter(t => t.status === "Sedang Dinilai").length;
-  const statSelesai = tugasList.filter(t => t.status === "Submit Final").length;
+  const resolvedTasks = tasks.map((task) => ({
+    task,
+    action: resolveAsesorTaskAction(task),
+  }));
+  const statBelum = resolvedTasks.filter(({ action }) => action.stage === "pra_asesmen").length;
+  const statSedang = resolvedTasks.filter(({ action }) =>
+    ["desk_evaluation", "menunggu_asesor", "asesmen_tahap2"].includes(action.stage),
+  ).length;
+  const statSelesai = resolvedTasks.filter(({ action }) =>
+    ["pleno", "selesai", "ditolak"].includes(action.stage),
+  ).length;
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
@@ -61,28 +78,28 @@ export default function AsesorDashboard() {
             <ClipboardList className="h-5 w-5" />
             <h3 className="font-medium">Total Tugas</h3>
           </div>
-          <p className="text-3xl font-bold">{tugasList.length}</p>
+          <p className="text-3xl font-bold">{isLoading ? "..." : tugasList.length}</p>
         </div>
         <div className="rounded-2xl border bg-card p-6 shadow-sm flex flex-col justify-between">
           <div className="flex items-center gap-3 text-amber-600 mb-4">
             <AlertCircle className="h-5 w-5" />
-            <h3 className="font-medium">Belum Dinilai</h3>
+            <h3 className="font-medium">Perlu Dimulai</h3>
           </div>
-          <p className="text-3xl font-bold">{statBelum}</p>
+          <p className="text-3xl font-bold">{isLoading ? "..." : statBelum}</p>
         </div>
         <div className="rounded-2xl border bg-card p-6 shadow-sm flex flex-col justify-between">
           <div className="flex items-center gap-3 text-blue-600 mb-4">
             <FileClock className="h-5 w-5" />
-            <h3 className="font-medium">Sedang Dinilai</h3>
+            <h3 className="font-medium">Dalam Proses</h3>
           </div>
-          <p className="text-3xl font-bold">{statSedang}</p>
+          <p className="text-3xl font-bold">{isLoading ? "..." : statSedang}</p>
         </div>
         <div className="rounded-2xl border bg-card p-6 shadow-sm flex flex-col justify-between">
           <div className="flex items-center gap-3 text-green-600 mb-4">
             <CheckCircle2 className="h-5 w-5" />
-            <h3 className="font-medium">Selesai (Final)</h3>
+            <h3 className="font-medium">Hasil Tersedia</h3>
           </div>
-          <p className="text-3xl font-bold">{statSelesai}</p>
+          <p className="text-3xl font-bold">{isLoading ? "..." : statSelesai}</p>
         </div>
       </div>
 
@@ -106,9 +123,13 @@ export default function AsesorDashboard() {
             className="bg-background border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 w-full sm:w-auto"
           >
             <option value="All">Semua Status</option>
-            <option value="Belum Dinilai">Belum Dinilai</option>
-            <option value="Sedang Dinilai">Sedang Dinilai</option>
-            <option value="Submit Final">Selesai / Submit Final</option>
+            <option value="pra_asesmen">Pra-Asesmen</option>
+            <option value="desk_evaluation">Penilaian Portofolio</option>
+            <option value="menunggu_asesor">Menunggu Asesor Lain</option>
+            <option value="asesmen_tahap2">Asesmen Tahap 2</option>
+            <option value="pleno">Sidang Pleno</option>
+            <option value="selesai">Selesai</option>
+            <option value="ditolak">Tidak Memenuhi Syarat</option>
           </select>
         </div>
       </div>
@@ -128,32 +149,68 @@ export default function AsesorDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredTugas.length > 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mb-3" />
+                      <p>Memuat tugas...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredTugas.length > 0 ? (
                 filteredTugas.map((task) => {
-                  const isPraAsesmenSubmitted = praAsesmenData[task.pemohonId]?.isSubmitted;
-                  
+                  const action = resolveAsesorTaskAction(task);
+                  const isPraAsesmenSubmitted = task.pra_asesmen?.is_submitted;
+                  const nama = task.pendaftaran?.user?.nama || "Tanpa Nama";
+                  const asalPt = task.pendaftaran?.riwayat_pendidikan?.[0]?.institusi || task.pendaftaran?.user?.instansi || "Tanpa Instansi";
+                  const prodi = task.pendaftaran?.prodi?.nama || "Prodi";
+
+                  const statusAlur = task.pendaftaran?.status_alur || "pra_asesmen";
+                  const isDeskEvalDone = task.status === "submit_final";
+                  const hasAt2 = Boolean(task.pendaftaran?.uji_lanjutan);
+                  const at2Done = task.pendaftaran?.uji_lanjutan?.fase_tulis === "selesai";
+
                   // Determine stepper progress
-                  const stepPra = isPraAsesmenSubmitted ? "done" : task.status === "Belum Dinilai" ? "active" : "pending";
-                  const stepDesk = isPraAsesmenSubmitted && task.status === "Sedang Dinilai" ? "active" : isPraAsesmenSubmitted && task.status === "Submit Final" ? "done" : "pending";
-                  const stepUji = task.status === "Submit Final" ? "done" : "pending";
-                  const stepFinal = task.status === "Submit Final" ? "done" : "pending";
+                  const stepPra = isPraAsesmenSubmitted ? "done" : "active";
+                  const stepDesk = isDeskEvalDone ? "done" : isPraAsesmenSubmitted ? "active" : "pending";
+
+                  let stepUji = "pending";
+                  if (statusAlur === "asesmen_tahap2") {
+                    stepUji = at2Done ? "done" : "active";
+                  } else if (hasAt2 && ["pleno", "finished"].includes(statusAlur)) {
+                    stepUji = "done";
+                  }
+
+                  let stepPleno = "pending";
+                  if (statusAlur === "pleno") {
+                    stepPleno = "active";
+                  } else if (["finished", "ditolak"].includes(statusAlur)) {
+                    stepPleno = "done";
+                  }
+
+                  let stepSelesai = "pending";
+                  if (["finished", "ditolak"].includes(statusAlur)) {
+                    stepSelesai = "done";
+                  }
 
                   const steps = [
                     { label: "Pra-Asesmen", state: stepPra },
                     { label: "Desk Eval", state: stepDesk },
-                    { label: "Uji Lanjut", state: stepUji },
-                    { label: "Submit", state: stepFinal },
+                    { label: "Asesmen Tahap 2", state: stepUji },
+                    { label: "Sidang Pleno", state: stepPleno },
+                    { label: "Selesai", state: stepSelesai },
                   ];
                   
                   return (
                     <tr key={task.id} className="hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3 font-mono text-xs">{task.id}</td>
                       <td className="px-4 py-3">
-                        <div className="font-bold text-foreground">{task.namaPemohon}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{task.asalPt}</div>
+                        <div className="font-bold text-foreground">{nama}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{asalPt}</div>
                       </td>
-                      <td className="px-4 py-3 font-medium">{task.prodi}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{task.tanggalMasuk}</td>
+                      <td className="px-4 py-3 font-medium">{prodi}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{new Date(task.created_at).toLocaleDateString('id-ID')}</td>
                       <td className="px-4 py-3">
                         {/* Stepper */}
                         <div className="flex items-center gap-0.5">
@@ -183,16 +240,20 @@ export default function AsesorDashboard() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {task.status === "Submit Final" ? (
-                          <Button variant="outline" size="sm" className="gap-2" onClick={() => router.push(`/asesor/workspace?pemohonId=${task.pemohonId}`)}>
-                            Lihat Hasil
-                          </Button>
-                        ) : (
-                          <Button size="sm" className="gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90" onClick={() => handleAction(task)}>
-                            {isPraAsesmenSubmitted ? "Lanjutkan Penilaian" : "Mulai Pra-Asesmen"}
+                        <div className="flex flex-col items-end gap-1.5">
+                          <span className="text-[10px] font-semibold text-muted-foreground">
+                            {action.stageLabel}
+                          </span>
+                          <Button
+                            variant={action.isComplete ? "outline" : "default"}
+                            size="sm"
+                            className={action.isComplete ? "gap-2" : "gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"}
+                            onClick={() => handleAction(task)}
+                          >
+                            {action.actionLabel}
                             <ArrowRight className="h-3 w-3" />
                           </Button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   );

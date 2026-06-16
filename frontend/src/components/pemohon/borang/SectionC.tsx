@@ -30,7 +30,7 @@ export default function SectionC() {
   const data = useBorangStore((s) => s.data.sectionC);
   const updateSection = useBorangStore((s) => s.updateSection);
 
-  const items: PekerjaanItem[] = data.items || [];
+  const items: PekerjaanItem[] = (data.items || []) as any[];
 
   const updateItem = (index: number, field: keyof PekerjaanItem, value: string) => {
     const newItems = [...items];
@@ -50,8 +50,8 @@ export default function SectionC() {
     updateSection("sectionC", { ...data, items: newItems });
   };
 
-  const organisasi: OrganisasiItem[] = data.organisasi || [];
-  const penghargaan: PenghargaanItem[] = data.penghargaan || [];
+  const organisasi: OrganisasiItem[] = (data.organisasi || []) as any[];
+  const penghargaan: PenghargaanItem[] = (data.penghargaan || []) as any[];
 
   const updateOrganisasi = (index: number, field: keyof OrganisasiItem, value: string) => {
     const newVal = [...organisasi];
@@ -83,6 +83,64 @@ export default function SectionC() {
           <p className="text-sm text-muted-foreground">
             Riwayat pekerjaan, organisasi profesi, dan penghargaan. Bagian ini tidak wajib diisi.
           </p>
+        </div>
+      </div>
+
+      {/* Pekerjaan Saat Ini */}
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm mb-8">
+        <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-muted-foreground">Pekerjaan / Instansi Saat Ini</h3>
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="instansi">Nama Instansi / Perusahaan</Label>
+            <Input
+              id="instansi"
+              placeholder="Contoh: PT. Bintang Persada"
+              value={data.instansi || ""}
+              onChange={(e) => updateSection("sectionC", { ...data, instansi: e.target.value })}
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pekerjaan">Jabatan / Pekerjaan</Label>
+            <Input
+              id="pekerjaan"
+              placeholder="Contoh: Staff IT"
+              value={data.pekerjaan || ""}
+              onChange={(e) => updateSection("sectionC", { ...data, pekerjaan: e.target.value })}
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="golongan">Golongan / Pangkat</Label>
+            <Input
+              id="golongan"
+              placeholder="Contoh: III/A (jika PNS/BUMN)"
+              value={data.golongan || ""}
+              onChange={(e) => updateSection("sectionC", { ...data, golongan: e.target.value })}
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="telpInstansi">Telp / Faks Instansi</Label>
+            <Input
+              id="telpInstansi"
+              placeholder="Contoh: (0511) 123456"
+              value={data.telpInstansi || ""}
+              onChange={(e) => updateSection("sectionC", { ...data, telpInstansi: e.target.value })}
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="alamatInstansi">Alamat Instansi</Label>
+            <textarea
+              id="alamatInstansi"
+              rows={2}
+              placeholder="Alamat lengkap instansi tempat bekerja saat ini..."
+              value={data.alamatInstansi || ""}
+              onChange={(e) => updateSection("sectionC", { ...data, alamatInstansi: e.target.value })}
+              className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            />
+          </div>
         </div>
       </div>
 

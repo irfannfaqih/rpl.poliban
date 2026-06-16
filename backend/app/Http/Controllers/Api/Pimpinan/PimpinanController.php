@@ -5,11 +5,17 @@ namespace App\Http\Controllers\Api\Pimpinan;
 use App\Http\Controllers\Controller;
 use App\Models\Pendaftaran;
 use App\Models\SkKeputusan;
+use App\Services\SkDocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class PimpinanController extends Controller
 {
+    public function __construct(
+        private SkDocumentService $skDocumentService,
+    ) {}
+
     /**
      * Dashboard summary
      */
@@ -37,27 +43,50 @@ class PimpinanController extends Controller
             $query->where('status', $request->status);
         }
 
-        return response()->json(['data' => $query->orderByDesc('created_at')->get()]);
+        $data = $query->orderByDesc('created_at')->paginate($request->get('per_page', 100));
+
+        return response()->json($data);
     }
 
     /**
-     * Terbitkan SK
+     * Terbitkan SK + generate QR Code verifikasi
      */
     public function terbitkanSk(Request $request, SkKeputusan $sk): JsonResponse
     {
         $validated = $request->validate([
-            'nomor_sk' => 'required|string|max:50',
+            'nomor_sk' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('sk_keputusan', 'nomor_sk')->ignore($sk->id),
+            ],
         ]);
 
-        $sk->update([
-            'status' => 'sk_terbit',
-            'nomor_sk' => $validated['nomor_sk'],
-            'tanggal_terbit' => now()->toDateString(),
-            'diterbitkan_oleh' => $request->user()->id,
-        ]);
+        try {
+            $this->skDocumentService->publish(
+                $sk,
+                $request->user(),
+                $validated['nomor_sk'],
+            );
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Gagal menerbitkan SK dan QR Code: '.$e->getMessage());
 
-        // Update pendaftaran status
-        $sk->pendaftaran->update(['status_alur' => 'finished']);
+            return response()->json([
+                'message' => 'SK gagal diterbitkan karena QR Code tidak dapat dibuat.',
+            ], 500);
+        }
+
+        $sk->pendaftaran->load('user');
+        if ($sk->pendaftaran->user && $sk->pendaftaran->user->email) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($sk->pendaftaran->user->email)
+                    ->queue(new \App\Mail\SKDiterbitkanMail($sk->pendaftaran, $sk->fresh()));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Gagal kirim SKDiterbitkanMail: '.$e->getMessage());
+            }
+        }
 
         return response()->json(['message' => 'SK berhasil diterbitkan', 'data' => $sk->fresh()->load('pendaftaran.user:id,nama')]);
     }

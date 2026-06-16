@@ -1,46 +1,107 @@
 "use client";
 
-import { usePendaftaranStore } from "@/store/usePendaftaranStore";
-import { 
-  CalendarDays, 
-  Clock, 
-  MapPin, 
-  User, 
-  Info, 
-  ArrowLeft, 
-  Download,
-  Calendar,
-  ExternalLink,
-  ChevronRight
-} from "lucide-react";
-import { motion } from "framer-motion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import {
+  ArrowLeft,
+  Calendar,
+  CalendarDays,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  Info,
+  MapPin,
+  User
+} from "lucide-react";
 import Link from "next/link";
 
-export default function JadwalPage() {
-  const { jadwal, statusAlur } = usePendaftaranStore();
+import api from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 
-  // Memaksa tampil true untuk kebutuhan demonstrasi UI
-  const hasSchedule = true; 
+export default function JadwalPage() {
+  const { data: pendaftaran } = useQuery({
+    queryKey: ['pendaftaran', 'schedule'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/pemohon/pendaftaran?view=schedule');
+      return res.data;
+    }
+  });
+
+  const statusAlur = pendaftaran?.status_alur || 'pre_submit';
+
+  const { data: listJadwal = [], isLoading } = useQuery({
+    queryKey: ['jadwal-pemohon'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/pemohon/jadwal');
+      return res.data || [];
+    }
+  });
+
+  const jadwal = listJadwal[0]; // Ambil jadwal terbaru
+  const hasSchedule = !!jadwal;
+
+  const handleDownloadKartu = async () => {
+    const toastId = toast.loading("Mengunduh Kartu Peserta Asesmen...");
+    try {
+      const response = await api.get('/pemohon/jadwal/kartu', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Kartu_Peserta_Asesmen.pdf');
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      link.parentNode?.removeChild(link);
+      toast.success("Kartu berhasil diunduh", { id: toastId });
+    } catch (error) {
+      toast.error("Gagal mengunduh kartu", { id: toastId });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground animate-pulse">Memuat jadwal...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!hasSchedule) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center rounded-2xl border bg-card/50">
-        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <CalendarDays className="h-8 w-8 text-muted-foreground" />
+      <div className="p-8 max-w-2xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Jadwal Asesmen</h1>
+          <p className="mt-1 text-xs text-muted-foreground">Jadwal pertemuan dengan asesor akan ditampilkan di sini.</p>
         </div>
-        <h1 className="text-xl font-bold tracking-tight">Belum Ada Jadwal</h1>
-        <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-          Saat ini belum ada jadwal asesmen yang ditetapkan untuk Anda.
-          Silakan tunggu informasi lebih lanjut.
-        </p>
-        <Link 
-          href="/pemohon/dashboard" 
-          className={cn(buttonVariants({ variant: "outline" }), "mt-8")}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Dashboard
-        </Link>
+        <div className="rounded-2xl border bg-card p-10 text-center space-y-4 shadow-sm">
+          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto">
+            <CalendarDays className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg">Belum Ada Jadwal</h2>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto leading-relaxed">
+              Saat ini belum ada jadwal asesmen yang ditetapkan untuk Anda.
+              Silakan tunggu informasi lebih lanjut.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full border">
+            <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Menunggu penetapan jadwal
+          </div>
+          <div className="pt-4">
+            <Link
+              href="/pemohon/dashboard"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-xs")}
+            >
+              <ArrowLeft className="mr-2 h-3.5 w-3.5" /> Kembali ke Dashboard
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -55,14 +116,14 @@ export default function JadwalPage() {
             Informasi lengkap mengenai agenda pertemuan asesmen Anda.
           </p>
         </div>
-        <Button variant="outline" className="hidden sm:flex" size="sm">
+        <Button variant="outline" className="hidden sm:flex" size="sm" onClick={handleDownloadKartu} disabled={!hasSchedule}>
           <Download className="mr-2 h-4 w-4" /> Unduh Kartu
         </Button>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Main Schedule Card */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="lg:col-span-2 space-y-6"
@@ -70,11 +131,11 @@ export default function JadwalPage() {
           <div className="overflow-hidden rounded-3xl border bg-card shadow-sm transition-all hover:shadow-md">
             {/* Header Color Strip */}
             <div className={`h-3 w-full bg-gradient-to-r ${statusAlur === 'asesmen_tahap2' ? 'from-purple-500 to-indigo-600' : 'from-blue-500 to-cyan-500'}`} />
-            
+
             <div className="p-8">
               <div className="flex items-center justify-between mb-8">
                 <div className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${statusAlur === 'asesmen_tahap2' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400'}`}>
-                  {jadwal.title}
+                  {statusAlur === 'asesmen_tahap2' ? 'Asesmen Tahap 2' : 'Pra Asesmen'}
                 </div>
                 <div className="flex items-center gap-1.5 text-sm font-medium text-orange-600 animate-pulse">
                   <span className="relative flex h-2 w-2">
@@ -92,12 +153,16 @@ export default function JadwalPage() {
                     <Calendar className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-tight">Hari & Tanggal</h3>
-                    <p className="text-base font-bold mt-0.5">{jadwal.date}</p>
-                    <div className="flex items-center gap-2 mt-1.5 text-primary text-sm font-medium">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{jadwal.time}</span>
-                    </div>
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-tight">Waktu Pelaksanaan</h3>
+                    <p className="text-base font-bold mt-0.5">
+                      {jadwal.tanggal ? new Date(jadwal.tanggal).toLocaleDateString('id-ID', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      }) : "Belum ditentukan"}
+                      {jadwal.waktu ? ` - ${jadwal.waktu}` : ""}
+                    </p>
                   </div>
                 </div>
 
@@ -108,20 +173,15 @@ export default function JadwalPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-tight">Lokasi / Tempat</h3>
-                    <p className="text-base font-bold mt-0.5">{jadwal.location}</p>
-                    {jadwal.room && (
-                      <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-muted px-2 py-0.5 text-xs font-semibold">
-                        {jadwal.room}
-                      </div>
-                    )}
-                    {jadwal.link && (
-                      <a 
-                        href={jadwal.link} 
-                        target="_blank" 
+                    <p className="text-base font-bold mt-0.5">{jadwal.tempat || "Belum ditentukan"}</p>
+                    {jadwal.link_meeting && (
+                      <a
+                        href={jadwal.link_meeting}
+                        target="_blank"
                         rel="noreferrer"
                         className={cn(buttonVariants({ variant: "link" }), "p-0 h-auto mt-2 text-primary gap-1")}
                       >
-                        Klik Link Pertemuan (Google Meet) <ExternalLink className="w-3 h-3" />
+                        Klik Link Pertemuan <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
                   </div>
@@ -132,17 +192,22 @@ export default function JadwalPage() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/5 text-primary border border-primary/10">
                     <User className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-tight">Dosen Penguji / Asesor</h3>
-                    <div className="space-y-2 mt-1">
-                      {jadwal.assessor.map((name, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <div className="w-1 h-1 rounded-full bg-primary" />
-                          <p className="text-base font-bold leading-none">{name}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-3">Tim Asesor Program Studi TI POLIBAN</p>
+                  <div className="flex-1">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-tight mb-2.5">Tim Asesor Penguji</h3>
+                    {pendaftaran?.penugasan_asesor && pendaftaran.penugasan_asesor.length > 0 ? (
+                      <div className="flex flex-col sm:flex-row gap-x-12 gap-y-5 mt-0.5">
+                        {pendaftaran.penugasan_asesor.map((tugas: any) => (
+                          <div key={tugas.id} className="relative">
+                            <p className="text-[10px] font-bold text-primary/80 uppercase tracking-widest mb-1">
+                              {tugas.urutan === 'asesor_1' ? 'Asesor 1' : 'Asesor 2'}
+                            </p>
+                            <p className="text-base font-bold leading-none text-foreground">{tugas.asesor?.nama || "Asesor"}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-base font-bold mt-0.5">Belum Ditugaskan</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -154,7 +219,7 @@ export default function JadwalPage() {
                   Instruksi Khusus
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed italic">
-                  "{jadwal.notes}"
+                  "{jadwal.catatan || "Tidak ada catatan khusus."}"
                 </p>
               </div>
             </div>
@@ -162,7 +227,7 @@ export default function JadwalPage() {
         </motion.div>
 
         {/* Sidebar Info/Preps */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}

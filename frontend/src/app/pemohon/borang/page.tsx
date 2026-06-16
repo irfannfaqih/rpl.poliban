@@ -1,34 +1,44 @@
 "use client";
 
-import { useEffect, useCallback, useState, useRef } from "react";
-import { motion } from "framer-motion";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import {
-  User,
-  GraduationCap,
-  Briefcase,
-  FileCheck,
-  Send,
-  Save,
-  CheckCircle2,
-  Clock,
-  ChevronRight,
-  AlertCircle,
-  X
-} from "lucide-react";
-import { AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { useBorangStore } from "@/store/useBorangStore";
-import { usePendaftaranStore } from "@/store/usePendaftaranStore";
 import SectionA from "@/components/pemohon/borang/SectionA";
 import SectionB from "@/components/pemohon/borang/SectionB";
 import SectionC from "@/components/pemohon/borang/SectionC";
 import SectionD from "@/components/pemohon/borang/SectionD";
 import SectionE from "@/components/pemohon/borang/SectionE";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { FOCUSED_STATUSES, getRedirectPath } from "@/lib/alur";
-import { LogOut } from "lucide-react";
+import { useBorangStore } from "@/store/useBorangStore";
+import { usePendaftaranStore } from "@/store/usePendaftaranStore";
+import { useShallow } from "zustand/react/shallow";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertCircle,
+  Briefcase,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  FileCheck,
+  GraduationCap,
+  LogOut,
+  Save,
+  Send,
+  User,
+  X
+} from "lucide-react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import api from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 
 /* ------------------------------------------------------------------ */
 /*  Section config                                                     */
@@ -43,19 +53,31 @@ const sections = [
 
 export default function BorangPage() {
   const router = useRouter();
-  const { 
-    activeSection, 
-    setActiveSection, 
-    touchedSections, 
-    validateSection, 
-    lastSaved 
-  } = useBorangStore();
-  
-  const { 
-    prodiId, 
-    submitPendaftaran, 
-    statusAlur 
-  } = usePendaftaranStore();
+  const {
+    activeSection,
+    setActiveSection,
+    touchedSections,
+    validateSection,
+    lastSaved
+  } = useBorangStore(useShallow((state) => ({
+    activeSection: state.activeSection,
+    setActiveSection: state.setActiveSection,
+    touchedSections: state.touchedSections,
+    validateSection: state.validateSection,
+    lastSaved: state.lastSaved,
+  })));
+
+  const prodiId = usePendaftaranStore((state) => state.prodiId);
+
+  const { data: pendaftaran, isLoading, refetch } = useQuery({
+    queryKey: ['pendaftaran', 'summary'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/pemohon/pendaftaran?view=summary');
+      return res.data;
+    }
+  });
+
+  const statusAlur = pendaftaran?.status_alur || 'pre_submit';
 
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -64,8 +86,8 @@ export default function BorangPage() {
   const observerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Access control
-  const isAllowedStatus = statusAlur === 'payment_verified';
-  const isFocusedMode = FOCUSED_STATUSES.includes(statusAlur);
+  const isAllowedStatus = statusAlur === 'pre_submit' || statusAlur === 'payment_verified';
+  const isFocusedMode = FOCUSED_STATUSES.includes(statusAlur as any);
 
   // Set mounted state
   useEffect(() => {
@@ -74,10 +96,10 @@ export default function BorangPage() {
 
   useEffect(() => {
     // If user is not allowed on this page, redirect them to their proper path
-    if (mounted && !isAllowedStatus) {
-      router.replace(getRedirectPath(statusAlur));
+    if (mounted && !isLoading && !isAllowedStatus) {
+      router.replace(getRedirectPath(statusAlur as any));
     }
-  }, [mounted, isAllowedStatus, statusAlur, router]);
+  }, [mounted, isLoading, isAllowedStatus, statusAlur, router]);
 
   const handleLogout = () => {
     // Simulate logout - in real app would clear tokens
@@ -123,7 +145,10 @@ export default function BorangPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleFinalSubmit = async () => {
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [hasAgreed, setHasAgreed] = useState(false);
+
+  const handleFinalSubmit = () => {
     // Check if all sections are valid
     const allValid = sections.every(s => validateSection(s.id, prodiId));
     if (!allValid) {
@@ -132,10 +157,142 @@ export default function BorangPage() {
       return;
     }
 
+    setShowSubmitDialog(true);
+  };
+
+  const executeFinalSubmit = async () => {
+    setShowSubmitDialog(false);
     setSubmitting(true);
-    await submitPendaftaran();
-    setSubmitting(false);
-    router.push("/pemohon/dashboard");
+    try {
+      const borangData = useBorangStore.getState().data;
+      const validUrls: string[] = [];
+      const sectionE = borangData.sectionE;
+
+      if (sectionE.dokumenWajib) {
+        if ((sectionE.dokumenWajib as any).IjazahUrl) validUrls.push((sectionE.dokumenWajib as any).IjazahUrl);
+        if ((sectionE.dokumenWajib as any).TranskripUrl) validUrls.push((sectionE.dokumenWajib as any).TranskripUrl);
+        if ((sectionE.dokumenWajib as any).KTPUrl) validUrls.push((sectionE.dokumenWajib as any).KTPUrl);
+        if ((sectionE.dokumenWajib as any).PasFotoUrl) validUrls.push((sectionE.dokumenWajib as any).PasFotoUrl);
+      }
+
+      if (sectionE.dokumenTambahan) {
+        sectionE.dokumenTambahan.forEach((dok: any) => {
+          if (dok.url) validUrls.push(dok.url);
+        });
+      }
+
+      // 1. Data Diri (Section A)
+      const secA = borangData.sectionA as any;
+      await api.post(`/pemohon/pendaftaran/${pendaftaran?.id}/data-diri`, {
+        nama_lengkap: secA.namaLengkap,
+        nik: secA.nik,
+        tempat_lahir: secA.tempatLahir,
+        tanggal_lahir: secA.tanggalLahir,
+        jenis_kelamin: secA.jenisKelamin,
+        agama: secA.agama || null,
+        kebangsaan: secA.kebangsaan || 'Indonesia',
+        no_hp: secA.noHP,
+        no_telp_rumah: secA.noTelpRumah || null,
+        alamat: secA.alamat,
+        kode_pos: secA.kodePos || null,
+        email_pribadi: secA.emailPribadi,
+      });
+
+      // 2. Riwayat Pendidikan & Transkrip (Section B)
+      const secB_items = borangData.sectionB.items as any[];
+      if (secB_items && secB_items.length > 0) {
+        await api.post(`/pemohon/pendaftaran/${pendaftaran?.id}/riwayat-pendidikan`, {
+          items: secB_items.map((i: any) => ({
+            jenjang: i.jenjang,
+            institusi: i.institusi,
+            program_studi: i.jurusan || i.program_studi || null,
+            tahun_masuk: parseInt(i.tahunMasuk) || new Date().getFullYear(),
+            tahun_lulus: parseInt(i.tahunLulus) || new Date().getFullYear(),
+            ipk: i.ipk ? parseFloat(i.ipk) : null,
+          }))
+        });
+      }
+
+      const secB_transkrip = borangData.sectionB.transkrip as any[];
+      if (secB_transkrip && secB_transkrip.length > 0) {
+        await api.post(`/pemohon/pendaftaran/${pendaftaran?.id}/transkrip`, {
+          items: secB_transkrip.map((t: any) => ({
+            semester: parseInt(t.semester) || 1,
+            nama_mk: t.namaMk,
+            sks: parseInt(t.sks) || 2,
+            nilai_huruf: t.nilaiHuruf,
+            nilai_angka: parseFloat(t.nilaiAngka) || 0,
+          }))
+        });
+      }
+
+      // 3. Pengalaman & Organisasi/Penghargaan (Section B & C)
+      const pengalamanItems: any[] = [];
+      const secB_pel = borangData.sectionB.pelatihan as any[];
+      if (secB_pel && secB_pel.length > 0) {
+        secB_pel.forEach((p: any) => {
+          if (p.nama) pengalamanItems.push({ tipe: 'pelatihan', nama: p.nama, tahun_mulai: parseInt(p.tahun) || new Date().getFullYear(), deskripsi: p.penyelenggara });
+        });
+      }
+      const secC_kerja = borangData.sectionC.items as any[];
+      if (secC_kerja && secC_kerja.length > 0) {
+        secC_kerja.forEach((c: any) => {
+          if (c.namaPerusahaan) pengalamanItems.push({ tipe: 'kerja', nama: c.namaPerusahaan, jabatan_peran: c.jabatan, tahun_mulai: parseInt(c.tahunMulai) || new Date().getFullYear(), tahun_selesai: c.tahunSelesai ? parseInt(c.tahunSelesai) : null, deskripsi: c.deskripsi });
+        });
+      }
+      const secC_org = borangData.sectionC.organisasi as any[];
+      if (secC_org && secC_org.length > 0) {
+        secC_org.forEach((o: any) => {
+          if (o.nama) pengalamanItems.push({ tipe: 'organisasi', nama: o.nama, jabatan_peran: o.peran, tahun_mulai: parseInt(o.tahun) || new Date().getFullYear() });
+        });
+      }
+      const secC_peng = borangData.sectionC.penghargaan as any[];
+      if (secC_peng && secC_peng.length > 0) {
+        secC_peng.forEach((p: any) => {
+          if (p.nama) pengalamanItems.push({ tipe: 'penghargaan', nama: p.nama, deskripsi: p.penyelenggara, tahun_mulai: parseInt(p.tahun) || new Date().getFullYear() });
+        });
+      }
+
+      const secC = borangData.sectionC as any;
+      if (pengalamanItems.length > 0 || secC.instansi) {
+        await api.post(`/pemohon/pendaftaran/${pendaftaran?.id}/pengalaman`, {
+          instansi: secC.instansi || null,
+          pekerjaan: secC.pekerjaan || null,
+          alamat_instansi: secC.alamatInstansi || null,
+          telp_instansi: secC.telpInstansi || null,
+          golongan: secC.golongan || null,
+          items: pengalamanItems
+        });
+      }
+
+      // 4. Evaluasi Diri (Section D)
+      const secD = borangData.sectionD as any;
+      if (secD.evaluasi) {
+        const evaluasiData = Object.entries(secD.evaluasi).map(([cpmkId, val]: [string, any]) => ({
+          cpmk_id: cpmkId,
+          profisiensi: Number(val.profisiensi),
+          dokumen_pendukung: val.dokumenPendukung || [],
+        })).filter(e => e.profisiensi && e.dokumen_pendukung.length > 0);
+
+        if (evaluasiData.length > 0) {
+          await api.post(`/pemohon/pendaftaran/${pendaftaran?.id}/evaluasi-diri`, {
+            items: evaluasiData
+          });
+        }
+      }
+
+      // 5. Final Submit & Dokumen
+      await api.post(`/pemohon/pendaftaran/${pendaftaran?.id}/submit`, {
+        valid_dokumen_urls: validUrls
+      });
+      // Refetch to get new status
+      await refetch();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+      router.push("/pemohon/dashboard");
+    }
   };
 
   // If not mounted or not allowed, render a simple loader while redirecting
@@ -162,10 +319,10 @@ export default function BorangPage() {
       >
         <div className="flex items-center gap-2.5">
           <div className="relative h-8 w-8">
-            <Image 
-              src="/poliban.png" 
-              alt="Logo POLIBAN" 
-              fill 
+            <Image
+              src="/poliban.png"
+              alt="Logo POLIBAN"
+              fill
               className="object-contain"
             />
           </div>
@@ -200,9 +357,9 @@ export default function BorangPage() {
             Langkah 2 dari 3
           </span>
           <div className="border-l border-border h-6 mx-1" />
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleLogout}
             className="text-muted-foreground hover:text-destructive gap-2"
           >
@@ -245,55 +402,41 @@ export default function BorangPage() {
               const isActive = activeSection === section.id;
               const isValid = validateSection(section.id, prodiId);
               const isTouched = touchedSections.includes(section.id);
-              
-              // Status Logic:
-              // 1. Valid -> Green
-              // 2. Touched but Invalid -> Red
-              // 3. Not Touched -> Neutral/Grey
-              
+
               let statusColorClass = "text-muted-foreground";
               let iconBgClass = "bg-muted text-muted-foreground";
-              
+
               if (isValid) {
                 statusColorClass = "text-green-600";
                 iconBgClass = "bg-green-100 text-green-600";
-              } else if (isTouched) {
-                statusColorClass = "text-red-500";
-                iconBgClass = "bg-red-100 text-red-500";
               }
 
               return (
                 <button
                   key={section.id}
                   onClick={() => scrollToSection(section.id)}
-                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition-all ${
-                    isActive
+                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition-all ${isActive
                       ? "bg-primary/5 text-primary font-bold shadow-sm"
                       : "text-foreground/70 hover:bg-muted"
-                  }`}
+                    }`}
                 >
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                      isActive && !isValid && !isTouched
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${isActive && !isValid
                         ? "bg-primary text-primary-foreground"
                         : iconBgClass
-                    }`}
+                      }`}
                   >
                     {isValid ? (
                       <CheckCircle2 className="h-4 w-4" />
-                    ) : isTouched && !isValid ? (
-                      <AlertCircle className="h-4 w-4" />
                     ) : (
                       <section.icon className={`h-4 w-4 ${isActive ? "animate-pulse" : ""}`} />
                     )}
                   </div>
-                  <span className={`flex-1 ${isTouched && !isValid ? "font-medium" : ""}`}>
+                  <span className="flex-1">
                     {section.label}
                   </span>
                   {isValid ? (
                     <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                  ) : isTouched ? (
-                    <AlertCircle className="h-3.5 w-3.5 text-red-500" />
                   ) : isActive ? (
                     <ChevronRight className="h-3.5 w-3.5 text-primary" />
                   ) : null}
@@ -306,7 +449,7 @@ export default function BorangPage() {
           <div className="border-t border-border/60 p-4">
             <Button
               onClick={handleFinalSubmit}
-              disabled={submitting}
+              disabled={submitting || validSectionsCount !== sections.length}
               className="w-full h-10 gap-2 rounded-xl text-sm font-semibold"
             >
               {submitting ? (
@@ -344,17 +487,16 @@ export default function BorangPage() {
             <SectionC />
           </div>
           <div ref={(el) => setRef("sectionE", el)} id="sectionE">
-            <SectionE />
+            <SectionE pendaftaranId={pendaftaran?.id} />
           </div>
           <div ref={(el) => setRef("sectionD", el)} id="sectionD">
             <SectionD />
           </div>
 
-          {/* Mobile final submit */}
           <div className="pb-10 lg:hidden">
             <Button
               onClick={handleFinalSubmit}
-              disabled={submitting}
+              disabled={submitting || validSectionsCount !== sections.length}
               className="w-full h-12 gap-2 rounded-xl text-sm font-semibold"
             >
               {submitting ? (
@@ -403,6 +545,71 @@ export default function BorangPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <Dialog open={showSubmitDialog} onOpenChange={(open) => {
+        setShowSubmitDialog(open);
+        if (!open) setHasAgreed(false);
+      }}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-2 border-b border-border/40">
+            <DialogTitle className="text-lg font-bold">
+              Konfirmasi Pengiriman
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-3 space-y-4">
+            <p className="text-sm text-foreground/80 leading-relaxed">
+              Dengan mengirimkan formulir RPL ini, saya menyatakan bahwa:
+            </p>
+            <ul className="space-y-3 text-sm text-foreground/70 list-disc pl-5">
+              <li className="pl-1">
+                <strong className="font-semibold text-foreground">Kebenaran Data:</strong> Seluruh informasi dan dokumen yang dilampirkan adalah benar. Saya bersedia menerima sanksi apabila terbukti ada pemalsuan.
+              </li>
+              <li className="pl-1">
+                <strong className="font-semibold text-foreground">Izin Verifikasi:</strong> Saya memberikan izin kepada pengelola RPL untuk memverifikasi keabsahan data saya ke pihak terkait.
+              </li>
+              <li className="pl-1">
+                <strong className="font-semibold text-foreground">Asesmen Lanjutan:</strong> Saya bersedia mengikuti tahapan asesmen lanjutan sesuai jadwal dari unit RPL.
+              </li>
+            </ul>
+
+            <label className="flex items-start gap-3 p-4 mt-2 cursor-pointer rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors">
+              <input
+                type="checkbox"
+                checked={hasAgreed}
+                onChange={(e) => setHasAgreed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded-sm border-primary text-primary focus:ring-primary cursor-pointer"
+              />
+              <span className="text-sm font-medium leading-relaxed select-none text-foreground/90">
+                Ya, saya menyetujui pernyataan di atas dan <span className="text-primary font-bold">bertanggung jawab penuh atas kebenaran data yang dikirim.</span>
+              </span>
+            </label>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button variant="ghost" onClick={() => setShowSubmitDialog(false)} disabled={submitting}>
+              Batal
+            </Button>
+            <Button
+              onClick={executeFinalSubmit}
+              disabled={submitting || !hasAgreed}
+              className="gap-2"
+            >
+              {submitting ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  Mengirim...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Kirim Formulir
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

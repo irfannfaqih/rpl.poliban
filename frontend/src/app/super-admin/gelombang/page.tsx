@@ -7,11 +7,12 @@ import {
   Search, 
   Edit, 
   Trash2, 
-  AlertCircle,
   CheckCircle2,
-  Power,
-  Loader2
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,15 +34,14 @@ interface Gelombang {
   tgl_sanggah: string;
   biaya: string;
   status: string;
+  status_dinamis: string;
 }
 
 export default function ManajemenGelombangPage() {
-  const [data, setData] = useState<Gelombang[]>([]);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Modals state
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [editTarget, setEditTarget] = useState<Gelombang | null>(null);
@@ -53,30 +53,72 @@ export default function ManajemenGelombangPage() {
   const formSanggah = useRef<HTMLInputElement>(null);
   const formBiaya = useRef<HTMLInputElement>(null);
 
-  // Fetch data from API
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const { data: res } = await api.get('/super-admin/gelombang', {
-        params: searchTerm ? { search: searchTerm } : {},
-      });
-      setData(res.data);
-    } catch (err) {
-      console.error('Failed to fetch gelombang:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Search with debounce
-  useEffect(() => {
-    const timer = setTimeout(() => fetchData(), 400);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Fetch data with React Query
+  const { data = [], isLoading: loading } = useQuery({
+    queryKey: ['gelombang', debouncedSearch],
+    queryFn: async () => {
+      const { data: res } = await api.get('/super-admin/gelombang', {
+        params: debouncedSearch ? { search: debouncedSearch } : {},
+      });
+      return res.data as Gelombang[];
+    }
+  });
+
+  // Mutations
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await api.delete(`/super-admin/gelombang/${id}`);
+    },
+    onSuccess: () => {
+      toast.success('Gelombang berhasil dihapus');
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['gelombang'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Gagal menghapus gelombang');
+    }
+  });
+
+  const changeStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number, status: string }) => {
+      await api.put(`/super-admin/gelombang/${id}`, { status });
+    },
+    onSuccess: () => {
+      toast.success('Status gelombang berhasil diubah');
+      queryClient.invalidateQueries({ queryKey: ['gelombang'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Gagal mengubah status');
+    }
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      if (editTarget) {
+        await api.put(`/super-admin/gelombang/${editTarget.id}`, payload);
+      } else {
+        await api.post('/super-admin/gelombang', payload);
+      }
+    },
+    onSuccess: () => {
+      toast.success(`Gelombang berhasil ${editTarget ? 'diperbarui' : 'ditambahkan'}`);
+      setIsFormModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['gelombang'] });
+    },
+    onError: (err: any) => {
+      const errors = err.response?.data?.errors;
+      if (errors) {
+        Object.values(errors).flat().forEach((e: any) => toast.error(e));
+      } else {
+        toast.error(err.response?.data?.message || 'Gagal menyimpan');
+      }
+    }
+  });
 
   const handleOpenAdd = () => {
     setEditTarget(null);
@@ -88,55 +130,28 @@ export default function ManajemenGelombangPage() {
     setIsFormModalOpen(true);
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await api.delete(`/super-admin/gelombang/${deleteTarget}`);
-      setDeleteTarget(null);
-      fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Gagal menghapus gelombang');
-    }
+  const handleDelete = () => {
+    if (deleteTarget) deleteMutation.mutate(deleteTarget);
   };
 
-  const handleToggleStatus = async (item: Gelombang) => {
-    try {
-      await api.patch(`/super-admin/gelombang/${item.id}/toggle-status`);
-      fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Gagal mengubah status');
-    }
+  const handleStatusClick = (g: Gelombang) => {
+    const current = g.status_dinamis;
+    let nextStatus = '';
+    if (current === 'aktif') nextStatus = 'selesai';
+    else if (current === 'selesai') nextStatus = 'draft';
+    else if (current === 'draft') nextStatus = 'aktif';
+    changeStatusMutation.mutate({ id: g.id, status: nextStatus });
   };
 
-  const handleSave = async () => {
-    const payload = {
+  const handleSave = () => {
+    saveMutation.mutate({
       nama: formNama.current?.value || '',
       tgl_buka: formBuka.current?.value || '',
       tgl_tutup: formTutup.current?.value || '',
       tgl_sanggah: formSanggah.current?.value || '',
       biaya: Number(formBiaya.current?.value) || 0,
       status: editTarget?.status || 'draft',
-    };
-
-    try {
-      setSaving(true);
-      if (editTarget) {
-        await api.put(`/super-admin/gelombang/${editTarget.id}`, payload);
-      } else {
-        await api.post('/super-admin/gelombang', payload);
-      }
-      setIsFormModalOpen(false);
-      fetchData();
-    } catch (err: any) {
-      const errors = err.response?.data?.errors;
-      if (errors) {
-        alert(Object.values(errors).flat().join('\n'));
-      } else {
-        alert(err.response?.data?.message || 'Gagal menyimpan');
-      }
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const formatDate = (dateStr: string) => {
@@ -220,27 +235,33 @@ export default function ManajemenGelombangPage() {
                       {Number(g.biaya).toLocaleString('id-ID')}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {g.status === "aktif" ? (
-                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 border-transparent shadow-none gap-1">
+                      {g.status_dinamis === "aktif" ? (
+                        <Badge 
+                          className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 border-transparent shadow-none gap-1 cursor-pointer"
+                          onClick={() => handleStatusClick(g)}
+                        >
                           <CheckCircle2 className="h-3 w-3" /> Aktif
                         </Badge>
-                      ) : g.status === "selesai" ? (
-                        <Badge variant="outline" className="text-slate-500 border-slate-200 dark:border-slate-800">
+                      ) : g.status_dinamis === "selesai" ? (
+                        <Badge 
+                          variant="outline" 
+                          className="text-slate-500 border-slate-200 dark:border-slate-800 cursor-pointer"
+                          onClick={() => handleStatusClick(g)}
+                        >
                           Selesai
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                        <Badge 
+                          variant="outline" 
+                          className="bg-amber-50 text-amber-700 border-amber-200 cursor-pointer"
+                          onClick={() => handleStatusClick(g)}
+                        >
                           Draft
                         </Badge>
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {g.status !== "aktif" && (
-                           <Button variant="ghost" size="icon" onClick={() => handleToggleStatus(g)} className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Aktifkan Gelombang">
-                             <Power className="h-4 w-4" />
-                           </Button>
-                        )}
                         <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(g)} className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -304,9 +325,9 @@ export default function ManajemenGelombangPage() {
             </div>
             
             <div className="p-6 border-t bg-muted/20 flex justify-end gap-3 shrink-0">
-              <Button variant="outline" onClick={() => setIsFormModalOpen(false)}>Batal</Button>
-              <Button onClick={handleSave} disabled={saving} className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-primary dark:text-primary-foreground">
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Menyimpan...</> : 'Simpan Gelombang'}
+              <Button variant="outline" onClick={() => setIsFormModalOpen(false)} disabled={saveMutation.isPending}>Batal</Button>
+              <Button onClick={handleSave} disabled={saveMutation.isPending} className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-primary dark:text-primary-foreground">
+                {saveMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Menyimpan...</> : 'Simpan Gelombang'}
               </Button>
             </div>
           </div>
@@ -325,8 +346,10 @@ export default function ManajemenGelombangPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Batal</Button>
-            <Button variant="destructive" onClick={handleDelete} className="bg-red-600 text-white hover:bg-red-700">Ya, Hapus Data</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>Batal</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending} className="bg-red-600 text-white hover:bg-red-700">
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Ya, Hapus Data'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

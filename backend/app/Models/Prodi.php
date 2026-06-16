@@ -9,8 +9,13 @@ class Prodi extends Model
     protected $table = 'prodi';
 
     protected $fillable = [
-        'kode', 'nama', 'jenjang', 'jurusan', 'status',
+        'kode', 'nama', 'jenjang', 'jurusan', 'jurusan_id', 'status',
     ];
+
+    public function jurusanData()
+    {
+        return $this->belongsTo(Jurusan::class, 'jurusan_id');
+    }
 
     public function mataKuliah()
     {

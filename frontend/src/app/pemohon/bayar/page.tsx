@@ -1,21 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { getRedirectPath } from "@/lib/alur";
+import api from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
 import {
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Copy,
   CreditCard,
   QrCode,
-  CheckCircle2,
-  Copy,
-  ArrowRight,
   Shield,
-  Clock,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { usePendaftaranStore } from "@/store/usePendaftaranStore";
-import { getRedirectPath } from "@/lib/alur";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -30,9 +32,26 @@ type PaymentMethod = "va" | "qris";
 
 export default function BayarPage() {
   const router = useRouter();
-  const simulatePayment = usePendaftaranStore((s) => s.simulatePayment);
-  const namaLengkap = usePendaftaranStore((s) => s.namaLengkap);
-  const statusAlur = usePendaftaranStore((s) => s.statusAlur);
+  const queryClient = useQueryClient();
+
+  const { data: pendaftaran, isLoading } = useQuery({
+    queryKey: ['pendaftaran', 'summary'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/pemohon/pendaftaran?view=summary');
+      return res.data;
+    }
+  });
+
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/me');
+      return res.user ?? null;
+    }
+  });
+
+  const namaLengkap = pendaftaran?.data_diri?.nama_lengkap || me?.nama || '';
+  const statusAlur = pendaftaran?.status_alur || 'pre_submit';
 
   const [method, setMethod] = useState<PaymentMethod>("va");
   const [processing, setProcessing] = useState(false);
@@ -48,10 +67,10 @@ export default function BayarPage() {
 
   // Guard: hanya boleh diakses saat status 'waiting_payment'
   useEffect(() => {
-    if (mounted && !isAllowedStatus) {
+    if (mounted && !isLoading && !isAllowedStatus) {
       router.replace(getRedirectPath(statusAlur));
     }
-  }, [mounted, isAllowedStatus, statusAlur, router]);
+  }, [mounted, isLoading, isAllowedStatus, statusAlur, router]);
 
   const vaNumber = "8800 1234 5678 9012";
   const amount = "Rp 500.000";
@@ -64,18 +83,26 @@ export default function BayarPage() {
 
   const handlePay = async () => {
     setProcessing(true);
-    await simulatePayment();
-    setPaid(true);
-    setProcessing(false);
+    try {
+      if (!pendaftaran?.id) throw new Error("Pendaftaran tidak ditemukan");
+      await api.post(`/pemohon/pendaftaran/${pendaftaran.id}/bayar`);
+      setPaid(true);
+      queryClient.invalidateQueries({ queryKey: ['pendaftaran'] });
+      toast.success("Pembayaran berhasil!");
 
-    // Redirect after showing success
-    setTimeout(() => {
-      router.push("/pemohon/borang");
-    }, 2000);
+      // Redirect after showing success
+      setTimeout(() => {
+        router.push("/pemohon/borang");
+      }, 2000);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Pembayaran gagal");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   // Tampilkan loader saat belum mounted atau status tidak sesuai
-  if (!mounted || !isAllowedStatus) {
+  if (!mounted || isLoading || !isAllowedStatus) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -97,10 +124,10 @@ export default function BayarPage() {
       >
         <div className="flex items-center gap-2.5">
           <div className="relative h-8 w-8">
-            <Image 
-              src="/poliban.png" 
-              alt="Logo POLIBAN" 
-              fill 
+            <Image
+              src="/poliban.png"
+              alt="Logo POLIBAN"
+              fill
               className="object-contain"
             />
           </div>
@@ -170,22 +197,20 @@ export default function BayarPage() {
             >
               <button
                 onClick={() => setMethod("va")}
-                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all ${
-                  method === "va"
+                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all ${method === "va"
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/30"
-                }`}
+                  }`}
               >
                 <CreditCard className="h-5 w-5" />
                 Virtual Account
               </button>
               <button
                 onClick={() => setMethod("qris")}
-                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all ${
-                  method === "qris"
+                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all ${method === "qris"
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/30"
-                }`}
+                  }`}
               >
                 <QrCode className="h-5 w-5" />
                 QRIS
@@ -269,7 +294,7 @@ export default function BayarPage() {
                 )}
               </Button>
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                Mode demo — klik tombol di atas untuk mensimulasikan pembayaran.
+                Mode demo - klik tombol di atas untuk mensimulasikan pembayaran.
               </p>
             </motion.div>
           </>

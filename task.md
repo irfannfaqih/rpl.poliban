@@ -2,23 +2,23 @@
 
 - `[x]` 1. Initialize Next.js 15 Project with Tailwind CSS v4 in `c:\SIRPL\frontend`.
 - `[x]` 2. Setup `shadcn/ui` with `npx shadcn@canary init` (for Tailwind v4 support).
-- `[/]` 3. Setup Global Styling & Variables (Framer Motion, modern colors).
-- `[ ]` 4. Create Global State Management (Zustand: `usePendaftaranStore` & `useBorangStore`).
-- `[ ]` 5. Build the Landing Page (`/`).
-  - `[ ]` 5.1 Hero Section with animations.
-  - `[ ]` 5.2 About RPL Section.
-  - `[ ]` 5.3 Timeline / Stepper Section.
-- `[ ]` 6. Build the Authentication Pages (`/login`, `/register`).
-- `[ ]` 7. Build Phase 1 Pemohon.
-  - `[ ]` 7.1 `/pemohon/bayar` Portal Pembayaran.
-  - `[ ]` 7.2 `/pemohon/borang` Guided Entry Long Form.
-    - `[ ]` Section A
-    - `[ ]` Section B
-    - `[ ]` Section C
-    - `[ ]` Section D
-    - `[ ]` Section E
-- `[ ]` 8. Build Phase 2 Pemohon (Panel Mode).
-  - `[ ]` 8.1 Sidebar Layout for pemohon post-submit.
-  - `[ ]` 8.2 `/pemohon/dashboard` (Status Tracker).
-  - `[ ]` 8.3 `/pemohon/arsip` (Read-only submissions).
-- `[ ]` 9. Quality Assurance & Final Polish.
+- `[x]` 3. Setup Global Styling & Variables (Framer Motion, modern colors).
+- `[x]` 4. Create Global State Management (Zustand: `usePendaftaranStore` & `useBorangStore`).
+- `[x]` 5. Build the Landing Page (`/`).
+  - `[x]` 5.1 Hero Section with animations.
+  - `[x]` 5.2 About RPL Section.
+  - `[x]` 5.3 Timeline / Stepper Section.
+- `[x]` 6. Build the Authentication Pages (`/login`, `/register`).
+- `[x]` 7. Build Phase 1 Pemohon.
+  - `[x]` 7.1 `/pemohon/bayar` Portal Pembayaran.
+  - `[x]` 7.2 `/pemohon/borang` Guided Entry Long Form.
+    - `[x]` Section A
+    - `[x]` Section B
+    - `[x]` Section C
+    - `[x]` Section D
+    - `[x]` Section E
+- `[x]` 8. Build Phase 2 Pemohon (Panel Mode).
+  - `[x]` 8.1 Sidebar Layout for pemohon post-submit.
+  - `[x]` 8.2 `/pemohon/dashboard` (Status Tracker).
+  - `[x]` 8.3 `/pemohon/arsip` (Read-only submissions).
+- `[x]` 9. Quality Assurance & Final Polish.

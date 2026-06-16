@@ -8,8 +8,10 @@ import { Eye, EyeOff, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { usePendaftaranStore } from "@/store/usePendaftaranStore";
-import { dataProdi } from "@/data/prodi";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { toast } from "sonner";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -22,23 +24,38 @@ const fadeUp = {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const setProfile = usePendaftaranStore((s) => s.setProfile);
-  const setStatusAlur = usePendaftaranStore((s) => s.setStatusAlur);
 
   const [nama, setNama] = useState("");
   const [email, setEmail] = useState("");
   const [prodiId, setProdiId] = useState("");
+  const [gelombangId, setGelombangId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const { data: prodiList = [] } = useQuery({
+    queryKey: ['prodi-aktif'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/public/prodi-aktif');
+      return res.data;
+    }
+  });
+
+  const { data: gelombangList = [] } = useQuery({
+    queryKey: ['gelombang-aktif'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/public/gelombang-aktif');
+      return res.data;
+    }
+  });
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!nama || !email || !password || !confirmPw || !prodiId) {
+    if (!nama || !email || !password || !confirmPw || !prodiId || !gelombangId) {
       setError("Mohon lengkapi semua field.");
       return;
     }
@@ -52,12 +69,33 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      // 1. Register User & Start Pendaftaran in one go
+      const { data: regRes } = await api.post('/register', { 
+        nama, 
+        email, 
+        password,
+        prodi_id: Number(prodiId),
+        gelombang_id: Number(gelombangId)
+      });
+      
+      // 2. Set Token automatically (auto login)
+      useAuthStore.getState().clearAuth(); // Clear old sessions (like super_admin)
+      localStorage.setItem("auth_token", regRes.token);
+      api.defaults.headers.common["Authorization"] = `Bearer ${regRes.token}`;
+      useAuthStore.setState({
+        token: regRes.token,
+        user: regRes.user,
+        isAuthenticated: true,
+      });
 
-    setProfile(nama, email, prodiId);
-    setStatusAlur("waiting_payment");
-    setLoading(false);
-    router.push("/pemohon/bayar");
+      toast.success("Registrasi berhasil!");
+      router.push("/pemohon/bayar");
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Gagal melakukan registrasi.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -102,27 +140,36 @@ export default function RegisterPage() {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="prodi">Program Studi Tujuan (RPL Tipe A1)</Label>
-          <select
-            id="prodi"
-            value={prodiId}
-            onChange={(e) => setProdiId(e.target.value)}
-            className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
-          >
-            <option value="" disabled className="bg-background text-muted-foreground">Pilih Program Studi</option>
-            {Array.from(new Set(dataProdi.map((p) => p.jurusan))).map((jurusan) => (
-              <optgroup key={jurusan} label={`Jurusan ${jurusan}`} className="bg-background text-foreground font-semibold">
-                {dataProdi
-                  .filter((p) => p.jurusan === jurusan)
-                  .map((p) => (
-                    <option key={p.id} value={p.id} className="bg-background text-foreground">
-                      {p.jenjang} {p.nama}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="gelombang">Gelombang Pendaftaran</Label>
+            <select
+              id="gelombang"
+              value={gelombangId}
+              onChange={(e) => setGelombangId(e.target.value)}
+              className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 text-foreground"
+            >
+              <option value="" disabled className="text-muted-foreground">Pilih Gelombang</option>
+              {gelombangList.map((g: any) => (
+                <option key={g.id} value={g.id}>{g.nama}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="prodi">Program Studi (RPL Tipe A1)</Label>
+            <select
+              id="prodi"
+              value={prodiId}
+              onChange={(e) => setProdiId(e.target.value)}
+              className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 text-foreground"
+            >
+              <option value="" disabled className="text-muted-foreground">Pilih Program Studi</option>
+              {prodiList.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.jenjang} - {p.nama}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="space-y-2">

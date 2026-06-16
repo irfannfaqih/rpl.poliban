@@ -50,7 +50,7 @@ return [
     |
     */
 
-    'expiration' => null,
+    'expiration' => 480, // 8 jam (480 menit) — sesuai jam kerja normal institusi
 
     /*
     |--------------------------------------------------------------------------

@@ -13,6 +13,8 @@ import {
   AlertCircle,
   Loader2
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -32,91 +34,131 @@ interface Prodi {
   nama: string;
   jenjang: string;
   jurusan: string;
+  jurusan_id: number;
+  jurusan_data?: { id: number; nama_jurusan: string };
   status: string;
   pendaftaran_count: number;
 }
 
 export default function ManajemenProdiPage() {
-  const [data, setData] = useState<Prodi[]>([]);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [editTarget, setEditTarget] = useState<Prodi | null>(null);
+  const [errors, setErrors] = useState<Record<string, string[]>>({});
 
   const formKode = useRef<HTMLInputElement>(null);
   const formNama = useRef<HTMLInputElement>(null);
-  const formJurusan = useRef<HTMLInputElement>(null);
+  const formJurusan = useRef<HTMLSelectElement>(null);
   const formJenjang = useRef<HTMLSelectElement>(null);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const { data: res } = await api.get('/super-admin/prodi', {
-        params: searchTerm ? { search: searchTerm } : {},
-      });
-      setData(res.data);
-    } catch (err) {
-      console.error('Failed to fetch prodi:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchData(); }, []);
   useEffect(() => {
-    const timer = setTimeout(() => fetchData(), 400);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const handleOpenAdd = () => { setEditTarget(null); setIsFormModalOpen(true); };
-  const handleOpenEdit = (item: Prodi) => { setEditTarget(item); setIsFormModalOpen(true); };
+  // Fetch Data with React Query
+  const { data = [], isLoading: loading } = useQuery({
+    queryKey: ['prodi', debouncedSearch],
+    queryFn: async () => {
+      const { data: res } = await api.get('/super-admin/prodi', {
+        params: debouncedSearch ? { search: debouncedSearch } : {},
+      });
+      return res.data as Prodi[];
+    }
+  });
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await api.delete(`/super-admin/prodi/${deleteTarget}`);
+  const { data: jurusans = [] } = useQuery({
+    queryKey: ['jurusans'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/super-admin/jurusan');
+      return res.data as { id: number; nama_jurusan: string }[];
+    }
+  });
+
+  // Mutations
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await api.delete(`/super-admin/prodi/${id}`);
+    },
+    onSuccess: () => {
+      toast.success('Prodi berhasil dihapus');
       setDeleteTarget(null);
-      fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Gagal menghapus prodi');
+      queryClient.invalidateQueries({ queryKey: ['prodi'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Gagal menghapus prodi');
     }
-  };
+  });
 
-  const handleToggleStatus = async (item: Prodi) => {
-    try {
-      await api.patch(`/super-admin/prodi/${item.id}/toggle-status`);
-      fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Gagal mengubah status');
+  const toggleStatusMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await api.patch(`/super-admin/prodi/${id}/toggle-status`);
+    },
+    onSuccess: () => {
+      toast.success('Status prodi berhasil diubah');
+      queryClient.invalidateQueries({ queryKey: ['prodi'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Gagal mengubah status');
     }
-  };
+  });
 
-  const handleSave = async () => {
-    const payload = {
-      kode: formKode.current?.value || '',
-      nama: formNama.current?.value || '',
-      jurusan: formJurusan.current?.value || '',
-      jenjang: formJenjang.current?.value || 'D3',
-    };
-    try {
-      setSaving(true);
+  const saveMutation = useMutation({
+    mutationFn: async (payload: any) => {
       if (editTarget) {
         await api.put(`/super-admin/prodi/${editTarget.id}`, payload);
       } else {
         await api.post('/super-admin/prodi', payload);
       }
+    },
+    onSuccess: () => {
+      toast.success(`Prodi berhasil ${editTarget ? 'diperbarui' : 'ditambahkan'}`);
       setIsFormModalOpen(false);
-      fetchData();
-    } catch (err: any) {
-      const errors = err.response?.data?.errors;
-      if (errors) alert(Object.values(errors).flat().join('\n'));
-      else alert(err.response?.data?.message || 'Gagal menyimpan');
-    } finally {
-      setSaving(false);
+      queryClient.invalidateQueries({ queryKey: ['prodi'] });
+    },
+    onError: (err: any) => {
+      if (err.response?.status === 422) {
+        setErrors(err.response.data.errors || {});
+      } else {
+        toast.error(err.response?.data?.message || 'Gagal menyimpan prodi');
+      }
     }
+  });
+
+  const handleOpenAdd = () => { setEditTarget(null); setErrors({}); setIsFormModalOpen(true); };
+  const handleOpenEdit = (item: Prodi) => { setEditTarget(item); setErrors({}); setIsFormModalOpen(true); };
+
+  const handleDelete = () => {
+    if (deleteTarget) deleteMutation.mutate(deleteTarget);
+  };
+
+  const handleToggleStatus = (item: Prodi) => {
+    toggleStatusMutation.mutate(item.id);
+  };
+
+  const handleSave = () => {
+    const payload = {
+      kode: formKode.current?.value || '',
+      nama: formNama.current?.value || '',
+      jurusan_id: formJurusan.current?.value ? parseInt(formJurusan.current.value) : null,
+      jenjang: formJenjang.current?.value || 'D3',
+    };
+
+    const newErrors: Record<string, string[]> = {};
+    if (!payload.kode.trim()) newErrors.kode = ["Kode Prodi wajib diisi."];
+    if (!payload.nama.trim()) newErrors.nama = ["Nama Program Studi wajib diisi."];
+    if (!payload.jurusan_id) newErrors.jurusan_id = ["Jurusan wajib dipilih."];
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    saveMutation.mutate(payload);
   };
 
   return (
@@ -162,17 +204,24 @@ export default function ManajemenProdiPage() {
                   <tr key={p.id} className="hover:bg-muted/10 transition-colors">
                     <td className="px-6 py-4 font-medium font-mono text-foreground">{p.kode}</td>
                     <td className="px-6 py-4 font-medium">{p.nama}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{p.jurusan}</td>
+                    <td className="px-6 py-4 text-muted-foreground">{p.jurusan_data?.nama_jurusan || p.jurusan}</td>
                     <td className="px-6 py-4 text-center">
                       <Badge variant="secondary" className="font-mono">{p.jenjang}</Badge>
                     </td>
                     <td className="px-6 py-4 text-center">
                       {p.status === "aktif" ? (
-                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 border-transparent shadow-none gap-1">
+                        <Badge 
+                          className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 border-transparent shadow-none gap-1 cursor-pointer"
+                          onClick={() => handleToggleStatus(p)}
+                        >
                           <CheckCircle2 className="h-3 w-3" /> Aktif
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-red-600 border-red-200 dark:border-red-900/50 gap-1 bg-red-50 dark:bg-red-950/20">
+                        <Badge 
+                          variant="outline" 
+                          className="text-red-600 border-red-200 dark:border-red-900/50 gap-1 bg-red-50 dark:bg-red-950/20 cursor-pointer"
+                          onClick={() => handleToggleStatus(p)}
+                        >
                           <XCircle className="h-3 w-3" /> Nonaktif
                         </Badge>
                       )}
@@ -182,9 +231,6 @@ export default function ManajemenProdiPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button onClick={() => handleToggleStatus(p)} variant="ghost" size="icon" className={`h-8 w-8 ${p.status === 'aktif' ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}`} title={p.status === 'aktif' ? 'Nonaktifkan' : 'Aktifkan'}>
-                          <Power className="h-4 w-4" />
-                        </Button>
                         <Button onClick={() => handleOpenEdit(p)} variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -212,30 +258,61 @@ export default function ManajemenProdiPage() {
             <div className="p-6 space-y-5 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Kode Prodi</label>
-                  <Input ref={formKode} defaultValue={editTarget?.kode || ""} placeholder="TI-D3" />
+                  <label className={`text-xs font-bold uppercase tracking-wider ${errors.kode ? 'text-red-500' : 'text-muted-foreground'}`}>Kode Prodi</label>
+                  <Input 
+                    ref={formKode} 
+                    defaultValue={editTarget?.kode || ""} 
+                    placeholder="TI-D3" 
+                    className={errors.kode ? "border-red-500 focus-visible:ring-red-500" : ""}
+                    onChange={() => setErrors(prev => ({ ...prev, kode: [] }))}
+                  />
+                  {errors.kode && errors.kode.length > 0 && <p className="text-[10px] text-red-500">{errors.kode[0]}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Jenjang</label>
-                  <select ref={formJenjang} defaultValue={editTarget?.jenjang || "D3"} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <label className={`text-xs font-bold uppercase tracking-wider ${errors.jenjang ? 'text-red-500' : 'text-muted-foreground'}`}>Jenjang</label>
+                  <select 
+                    ref={formJenjang} 
+                    defaultValue={editTarget?.jenjang || "D3"} 
+                    className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${errors.jenjang ? 'border-red-500 focus:ring-red-500' : 'border-input focus:ring-ring'}`}
+                    onChange={() => setErrors(prev => ({ ...prev, jenjang: [] }))}
+                  >
                     <option value="D3">D3</option>
                     <option value="D4">D4</option>
                   </select>
+                  {errors.jenjang && errors.jenjang.length > 0 && <p className="text-[10px] text-red-500">{errors.jenjang[0]}</p>}
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nama Program Studi</label>
-                <Input ref={formNama} defaultValue={editTarget?.nama || ""} placeholder="Teknik Informatika" />
+                <label className={`text-xs font-bold uppercase tracking-wider ${errors.nama ? 'text-red-500' : 'text-muted-foreground'}`}>Nama Program Studi</label>
+                <Input 
+                  ref={formNama} 
+                  defaultValue={editTarget?.nama || ""} 
+                  placeholder="Teknik Informatika" 
+                  className={errors.nama ? "border-red-500 focus-visible:ring-red-500" : ""}
+                  onChange={() => setErrors(prev => ({ ...prev, nama: [] }))}
+                />
+                {errors.nama && errors.nama.length > 0 && <p className="text-[10px] text-red-500">{errors.nama[0]}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Jurusan</label>
-                <Input ref={formJurusan} defaultValue={editTarget?.jurusan || ""} placeholder="Teknik Elektro" />
+                <label className={`text-xs font-bold uppercase tracking-wider ${errors.jurusan_id ? 'text-red-500' : 'text-muted-foreground'}`}>Jurusan <span className="text-red-500">*</span></label>
+                <select 
+                  ref={formJurusan} 
+                  defaultValue={editTarget?.jurusan_id || ""} 
+                  className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${errors.jurusan_id ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  onChange={() => setErrors(prev => ({ ...prev, jurusan_id: [] }))}
+                >
+                  <option value="" disabled>Pilih Jurusan...</option>
+                  {jurusans.map(j => (
+                    <option key={j.id} value={j.id}>{j.nama_jurusan}</option>
+                  ))}
+                </select>
+                {errors.jurusan_id && errors.jurusan_id.length > 0 && <p className="text-[10px] text-red-500">{errors.jurusan_id[0]}</p>}
               </div>
             </div>
             <div className="p-6 border-t bg-muted/20 flex justify-end gap-3 shrink-0">
-              <Button variant="outline" onClick={() => setIsFormModalOpen(false)}>Batal</Button>
-              <Button onClick={handleSave} disabled={saving} className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-primary dark:text-primary-foreground">
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Menyimpan...</> : 'Simpan Prodi'}
+              <Button variant="outline" onClick={() => setIsFormModalOpen(false)} disabled={saveMutation.isPending}>Batal</Button>
+              <Button onClick={handleSave} disabled={saveMutation.isPending} className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-primary dark:text-primary-foreground">
+                {saveMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Menyimpan...</> : 'Simpan Prodi'}
               </Button>
             </div>
           </div>
@@ -253,8 +330,10 @@ export default function ManajemenProdiPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Batal</Button>
-            <Button variant="destructive" onClick={handleDelete} className="bg-red-600 text-white hover:bg-red-700">Ya, Hapus Data</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>Batal</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending} className="bg-red-600 text-white hover:bg-red-700">
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Ya, Hapus Data'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

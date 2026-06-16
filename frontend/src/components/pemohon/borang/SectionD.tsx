@@ -1,11 +1,11 @@
 "use client";
 
-import { useBorangStore } from "@/store/useBorangStore";
-import { usePendaftaranStore } from "@/store/usePendaftaranStore";
-import { dataProdi } from "@/data/prodi";
 import { Label } from "@/components/ui/label";
-import { FileCheck, ChevronDown, ChevronUp, Search, BookOpen, AlertCircle } from "lucide-react";
-import { useState, useMemo } from "react";
+import api from "@/lib/api";
+import { useBorangStore } from "@/store/useBorangStore";
+import { useQuery } from "@tanstack/react-query";
+import { AlertCircle, BookOpen, ChevronDown, ChevronUp, FileCheck, Loader2, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 type Profisiensi = 1 | 2 | 4 | 5 | null;
 
@@ -14,39 +14,53 @@ interface CpmkEval {
   dokumenPendukung: string[];
 }
 
+interface CpmkItem {
+  id: string;
+  deskripsi: string;
+}
+
+interface MataKuliahItem {
+  kode: string;
+  nama: string;
+  sks: number;
+  deskripsi: string;
+  cpmk: CpmkItem[];
+}
+
+// Skala profisiensi sesuai master formulir F03 Asesmen Mandiri
+// 1 = tidak mampu, 2 = kurang mampu, 4 = mampu, 5 = sangat mampu
 const PROFISIENSI_OPTIONS = [
   {
     value: 1 as Profisiensi,
-    label: "1 (Tidak Mampu)",
+    label: "1",
     desc: "Tidak mampu melakukan unjuk kerja",
-    activeClass: "border-slate-500 bg-slate-50 text-slate-700 shadow-sm shadow-slate-100 ring-1 ring-slate-500/20",
-    hoverClass: "hover:border-slate-300 hover:bg-slate-50/50",
+    activeClass: "border-red-500 bg-red-50 text-red-700 shadow-sm ring-1 ring-red-500/20",
+    hoverClass: "hover:border-red-300 hover:bg-red-50/50",
   },
   {
     value: 2 as Profisiensi,
-    label: "2 (Kurang Mampu)",
+    label: "2",
     desc: "Kurang mampu melakukan unjuk kerja",
-    activeClass: "border-amber-500 bg-amber-50 text-amber-700 shadow-sm shadow-amber-100 ring-1 ring-amber-500/20",
+    activeClass: "border-amber-500 bg-amber-50 text-amber-700 shadow-sm ring-1 ring-amber-500/20",
     hoverClass: "hover:border-amber-300 hover:bg-amber-50/50",
   },
   {
     value: 4 as Profisiensi,
-    label: "4 (Mampu)",
+    label: "4",
     desc: "Mampu melakukan unjuk kerja",
-    activeClass: "border-blue-500 bg-blue-50 text-blue-700 shadow-sm shadow-blue-100 ring-1 ring-blue-500/20",
+    activeClass: "border-blue-500 bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-500/20",
     hoverClass: "hover:border-blue-300 hover:bg-blue-50/50",
   },
   {
     value: 5 as Profisiensi,
-    label: "5 (Sangat Mampu)",
+    label: "5",
     desc: "Sangat mampu melakukan unjuk kerja",
-    activeClass: "border-green-500 bg-green-50 text-green-700 shadow-sm shadow-green-100 ring-1 ring-green-500/20",
+    activeClass: "border-green-500 bg-green-50 text-green-700 shadow-sm ring-1 ring-green-500/20",
     hoverClass: "hover:border-green-300 hover:bg-green-50/50",
   },
 ];
 
 export default function SectionD() {
-  const prodiId = usePendaftaranStore((s) => s.prodiId);
   const data = useBorangStore((s) => s.data.sectionD);
   const updateSection = useBorangStore((s) => s.updateSection);
   const sectionEData = useBorangStore((s) => s.data.sectionE);
@@ -54,10 +68,20 @@ export default function SectionD() {
   const [expandedMk, setExpandedMk] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Fetch kurikulum from API instead of hardcoded data
+  const { data: kurikulum = [], isLoading: kurikulumLoading } = useQuery<MataKuliahItem[]>({
+    queryKey: ["pemohon", "kurikulum"],
+    queryFn: async () => {
+      const { data: res } = await api.get("/pemohon/kurikulum");
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Derive document list from Section E data (stable via useMemo)
   const dokumenList = useMemo(() => {
     const list: { id: string; label: string }[] = [];
-    const wajib = sectionEData.dokumenWajib || {};
+    const wajib = (sectionEData.dokumenWajib || {}) as any;
 
     if (wajib.KTP) list.push({ id: "KTP", label: "KTP" });
     if (wajib.Ijazah) list.push({ id: "Ijazah", label: "Ijazah Terakhir" });
@@ -67,15 +91,16 @@ export default function SectionD() {
     const tambahan = sectionEData.dokumenTambahan || [];
     tambahan.forEach((dok) => {
       if (dok.fileName) {
-        list.push({ id: dok.id, label: `${dok.id} — ${dok.deskripsi || dok.tipe}` });
+        // Gunakan dbId jika tersedia (sudah di-upload dan ada di database)
+        // fallback ke DOK-id sementara
+        const key = dok.dbId || dok.id;
+        list.push({ id: key, label: `${dok.deskripsi || dok.tipe}` });
       }
     });
 
     return list;
   }, [sectionEData]);
 
-  const selectedProdi = dataProdi.find((p) => p.id === prodiId);
-  const kurikulum = selectedProdi?.kurikulum || [];
   const evaluasi: Record<string, CpmkEval> = data.evaluasi || {};
 
   const filteredKurikulum = useMemo(() => {
@@ -118,19 +143,20 @@ export default function SectionD() {
     updateCpmkEval(cpmkId, "dokumenPendukung", next);
   };
 
-  const filledCount = Object.values(evaluasi).filter((v) => v.profisiensi).length;
-  const totalCpmk = kurikulum.reduce((acc, mk) => acc + mk.cpmk.length, 0);
+  const totalCpmk = useMemo(() => {
+    return kurikulum.reduce((acc, mk) => acc + mk.cpmk.length, 0);
+  }, [kurikulum]);
 
-  if (!prodiId) {
-    return (
-      <div className="p-8 text-center text-muted-foreground border rounded-2xl bg-card">
-        <p>Anda belum memilih Program Studi pada saat registrasi.</p>
-        <p className="text-sm mt-2">
-          Mohon kembali ke halaman sebelumnya atau perbarui profil Anda.
-        </p>
-      </div>
-    );
-  }
+  const filledCount = useMemo(() => {
+    return Object.values(evaluasi).filter((e) => e.profisiensi !== null).length;
+  }, [evaluasi]);
+
+  // Sync totalCpmk to store for validation
+  useEffect(() => {
+    if (totalCpmk > 0 && (data as any).totalCpmk !== totalCpmk) {
+      updateSection("sectionD", { ...data, totalCpmk });
+    }
+  }, [totalCpmk, data, updateSection]);
 
   return (
     <div>
@@ -140,7 +166,7 @@ export default function SectionD() {
         </div>
         <div>
           <h2 className="text-xl font-bold tracking-tight">
-            E. Formulir Evaluasi Diri
+            D. Formulir Evaluasi Diri
           </h2>
           <p className="text-sm text-muted-foreground">
             Evaluasi diri terhadap Capaian Pembelajaran Mata Kuliah (CPMK).
@@ -148,21 +174,21 @@ export default function SectionD() {
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm">
+      <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-50/50 dark:bg-blue-900/10 p-4 text-sm">
         <div className="flex gap-3">
           <div className="mt-0.5">
-            <BookOpen className="h-4 w-4 text-blue-500" />
+            <BookOpen className="h-5 w-5 text-blue-500" />
           </div>
-          <div className="space-y-1">
-            <p className="font-semibold text-blue-700 dark:text-blue-300">Petunjuk Pengisian:</p>
-            <ol className="list-decimal list-inside leading-relaxed text-foreground/80 space-y-1">
-              <li>Pilih tingkat <strong>profisiensi</strong> Anda untuk setiap CPMK.</li>
-              <li>Centang <strong>dokumen bukti</strong> yang mendukung klaim Anda (dari dokumen yang sudah diunggah di bagian Dokumen Pendukung).</li>
+          <div className="space-y-3 flex-1">
+            <p className="font-semibold text-blue-700 dark:text-blue-300 text-base">Petunjuk Pengisian:</p>
+            <ol className="list-decimal list-inside leading-relaxed text-foreground/80 space-y-2">
+              <li>Pilih tingkat <strong>profisiensi</strong> (kemampuan) Anda untuk setiap CPMK, dengan nilai 1 (belum menguasai) hingga 5 (sangat ahli).</li>
+              <li>Centang <strong>dokumen bukti</strong> yang memperkuat klaim Anda (diambil dari berkas Dokumen Pendukung).</li>
             </ol>
-            <div className="pt-2 flex items-center gap-4 font-medium text-foreground">
-              <div className="flex items-center gap-1.5">
+            <div className="pt-2 flex items-center gap-3 font-medium text-foreground">
+              <div className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900/40 px-3 py-1.5 rounded-full text-blue-800 dark:text-blue-300">
                 <div className="h-2 w-2 rounded-full bg-blue-500" />
-                <span>Progress: {filledCount} / {totalCpmk} CPMK</span>
+                <span className="text-xs">Progress: {filledCount} / {totalCpmk} CPMK Terisi</span>
               </div>
             </div>
           </div>
@@ -197,6 +223,25 @@ export default function SectionD() {
         </div>
       </div>
 
+      {/* Loading state */}
+      {kurikulumLoading && (
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin mb-3" />
+          <p className="text-sm font-medium">Memuat data kurikulum...</p>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!kurikulumLoading && kurikulum.length === 0 && (
+        <div className="text-center py-12 rounded-2xl border border-dashed bg-muted/20">
+          <BookOpen className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+          <p className="font-semibold text-foreground">Belum Ada Kurikulum</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+            Admin Program Studi belum memasukkan data mata kuliah dan CPMK untuk prodi Anda. Silakan hubungi admin prodi.
+          </p>
+        </div>
+      )}
+
       <div className="space-y-4">
         {filteredKurikulum.map((mk) => {
           const isExpanded = expandedMk === mk.kode;
@@ -207,20 +252,18 @@ export default function SectionD() {
           return (
             <div
               key={mk.kode}
-              className={`group rounded-2xl border transition-all duration-300 overflow-hidden ${
-                isExpanded 
-                  ? "border-primary shadow-lg ring-1 ring-primary/10" 
-                  : "border-border bg-card hover:border-primary/40 hover:shadow-md"
-              }`}
+              className={`group rounded-2xl border transition-all duration-300 overflow-hidden ${isExpanded
+                ? "border-primary shadow-lg ring-1 ring-primary/10"
+                : "border-border bg-card hover:border-primary/40 hover:shadow-md"
+                }`}
             >
               <button
                 onClick={() => setExpandedMk(isExpanded ? null : mk.kode)}
                 className="w-full flex items-center justify-between p-5 text-left"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
-                    isComplete ? "bg-green-100 text-green-600" : "bg-muted text-muted-foreground"
-                  }`}>
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${isComplete ? "bg-green-100 text-green-600" : "bg-muted text-muted-foreground"
+                    }`}>
                     <span className="text-xs font-bold">{mk.sks} SKS</span>
                   </div>
                   <div>
@@ -282,11 +325,10 @@ export default function SectionD() {
                                     key={opt.value}
                                     type="button"
                                     onClick={() => updateCpmkEval(cpmk.id, "profisiensi", opt.value)}
-                                    className={`relative flex flex-col items-center justify-center py-3.5 rounded-xl border-2 text-xs font-bold transition-all duration-300 transform active:scale-95 ${
-                                      isSelected
-                                        ? opt.activeClass
-                                        : `border-border bg-card text-muted-foreground ${opt.hoverClass}`
-                                    }`}
+                                    className={`relative flex flex-col items-center justify-center py-3.5 rounded-xl border-2 text-xs font-bold transition-all duration-300 transform active:scale-95 ${isSelected
+                                      ? opt.activeClass
+                                      : `border-border bg-card text-muted-foreground ${opt.hoverClass}`
+                                      }`}
                                   >
                                     {opt.label}
                                   </button>
@@ -309,17 +351,15 @@ export default function SectionD() {
                                       key={dok.id}
                                       type="button"
                                       onClick={() => toggleDokumen(cpmk.id, dok.id)}
-                                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all duration-200 ${
-                                        isChecked
-                                          ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/20"
-                                          : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-primary/5"
-                                      }`}
+                                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all duration-200 ${isChecked
+                                        ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/20"
+                                        : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-primary/5"
+                                        }`}
                                     >
-                                      <span className={`flex h-4 w-4 items-center justify-center rounded border-2 text-[10px] transition-colors ${
-                                        isChecked 
-                                          ? "border-primary bg-primary text-white" 
-                                          : "border-muted-foreground/30"
-                                      }`}>
+                                      <span className={`flex h-4 w-4 items-center justify-center rounded border-2 text-[10px] transition-colors ${isChecked
+                                        ? "border-primary bg-primary text-white"
+                                        : "border-muted-foreground/30"
+                                        }`}>
                                         {isChecked && "✓"}
                                       </span>
                                       {dok.label}
