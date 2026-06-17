@@ -26,6 +26,14 @@ export const metadata: Metadata = {
     "Rekognisi Pembelajaran Lampau",
     "Politeknik Negeri Banjarmasin",
   ],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    shortcut: ["/favicon.ico"],
+    apple: [{ url: "/icon.png" }],
+  },
 };
 
 export default function RootLayout({
