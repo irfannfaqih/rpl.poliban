@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -314,11 +315,30 @@ class AuthController extends Controller
             "email" => "required|email",
         ]);
 
-        Password::sendResetLink($request->only("email"));
+        $status = Password::sendResetLink($request->only("email"));
+
+        Log::info('password.reset.link.requested', [
+            'context' => 'forgot_password',
+            'status' => $status,
+            'email_hash' => hash('sha256', strtolower($request->input('email'))),
+            'email_domain' => substr(strrchr($request->input('email'), '@') ?: '', 1) ?: null,
+        ]);
+
+        if ($status === Password::RESET_THROTTLED) {
+            return response()->json([
+                "message" => "Permintaan reset password terlalu sering. Silakan tunggu beberapa saat sebelum mencoba lagi.",
+            ], 429);
+        }
+
+        if ($status === Password::RESET_LINK_SENT || $status === Password::INVALID_USER) {
+            return response()->json([
+                "message" => "Jika email terdaftar, instruksi reset password telah dikirimkan.",
+            ]);
+        }
 
         return response()->json([
-            "message" => "Jika email terdaftar, instruksi reset password telah dikirimkan.",
-        ]);
+            "message" => "Tautan reset belum dapat dikirim. Silakan coba lagi nanti.",
+        ], 503);
     }
 
     public function resetPassword(Request $request): JsonResponse

@@ -7,12 +7,15 @@ use App\Services\Telemetry\Metrics;
 use App\Services\Telemetry\NullExternalErrorTracker;
 use App\Services\Telemetry\QueryTelemetry;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 
@@ -103,6 +106,20 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
+        Event::listen(MessageSending::class, function (MessageSending $event): void {
+            Log::info('mail.message.sending', $this->mailTelemetryPayload($event->message));
+        });
+
+        Event::listen(MessageSent::class, function (MessageSent $event): void {
+            $payload = $this->mailTelemetryPayload($event->message);
+
+            if (isset($event->sent) && is_callable([$event->sent, 'getMessageId'])) {
+                $payload['message_id_hash'] = hash('sha256', (string) $event->sent->getMessageId());
+            }
+
+            Log::info('mail.message.sent', $payload);
+        });
+
         \App\Models\Pendaftaran::observe(\App\Observers\AuditObserver::class);
         \App\Models\EvaluasiDiri::observe(\App\Observers\AuditObserver::class);
         \App\Models\VerifikasiBerkas::observe(\App\Observers\AuditObserver::class);
@@ -110,5 +127,39 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\JadwalAsesmen::observe(\App\Observers\AuditObserver::class);
         \App\Models\PenilaianCpmk::observe(\App\Observers\AuditObserver::class);
         \App\Models\PlenoMk::observe(\App\Observers\AuditObserver::class);
+    }
+
+    /**
+     * Build sanitized mail telemetry. Never log body, password, tokens, reset URLs,
+     * or full recipient addresses.
+     *
+     * @return array<string, mixed>
+     */
+    private function mailTelemetryPayload(mixed $message): array
+    {
+        return [
+            'mailer' => config('mail.default'),
+            'from_domains' => $this->addressDomains($message->getFrom()),
+            'to_domains' => $this->addressDomains($message->getTo()),
+            'cc_count' => count($message->getCc()),
+            'bcc_count' => count($message->getBcc()),
+            'subject_hash' => hash('sha256', (string) $message->getSubject()),
+            'subject_length' => strlen((string) $message->getSubject()),
+        ];
+    }
+
+    /**
+     * @param array<int, object> $addresses
+     * @return array<int, string>
+     */
+    private function addressDomains(array $addresses): array
+    {
+        return collect($addresses)
+            ->map(fn ($address) => method_exists($address, 'getAddress') ? $address->getAddress() : '')
+            ->map(fn (string $email) => substr(strrchr($email, '@') ?: '', 1) ?: null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 }

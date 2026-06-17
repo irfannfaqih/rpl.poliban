@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 
@@ -186,6 +187,23 @@ class PenggunaController extends Controller
     public function resetPassword(User $pengguna): JsonResponse
     {
         $status = Password::sendResetLink(["email" => $pengguna->email]);
+
+        Log::info('password.reset.link.requested', [
+            'context' => 'super_admin_reset',
+            'status' => $status,
+            'user_id' => $pengguna->id,
+            'email_hash' => hash('sha256', strtolower($pengguna->email)),
+            'email_domain' => substr(strrchr($pengguna->email, '@') ?: '', 1) ?: null,
+        ]);
+
+        if ($status === Password::RESET_THROTTLED) {
+            return response()->json(
+                [
+                    "message" => "Permintaan reset password terlalu sering. Silakan tunggu beberapa saat sebelum mencoba lagi.",
+                ],
+                429,
+            );
+        }
 
         if ($status !== Password::RESET_LINK_SENT) {
             return response()->json(
