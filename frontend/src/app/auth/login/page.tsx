@@ -109,7 +109,7 @@ function LoginContent() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Selamat Datang</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Masuk ke akun RPL Anda untuk melanjutkan pendaftaran.
+            Masuk ke akun Anda untuk melanjutkan proses pendaftaran RPL.
           </p>
         </motion.div>
 

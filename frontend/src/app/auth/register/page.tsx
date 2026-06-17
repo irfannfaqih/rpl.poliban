@@ -106,7 +106,7 @@ export default function RegisterPage() {
         </div>
         <h1 className="text-2xl font-bold tracking-tight">Buat Akun Baru</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Daftarkan diri Anda untuk memulai proses RPL.
+          Daftarkan diri Anda untuk memulai pendaftaran RPL.
         </p>
       </motion.div>
 
@@ -157,7 +157,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="prodi">Program Studi (RPL Tipe A1)</Label>
+            <Label htmlFor="prodi">Program Studi (RPL)</Label>
             <select
               id="prodi"
               value={prodiId}

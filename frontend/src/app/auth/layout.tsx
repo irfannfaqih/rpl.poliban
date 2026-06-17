@@ -43,12 +43,10 @@ export default function AuthLayout({
 
         <div className="relative z-10 max-w-md">
           <h2 className="text-3xl font-bold leading-tight text-white">
-            Wujudkan Pengalaman Kerja Anda Menjadi Kredit Akademik
+            Lanjutkan Studi Anda ke Jenjang Lebih Tinggi
           </h2>
           <p className="mt-4 text-blue-100 leading-relaxed">
-            Sistem Rekognisi Pembelajaran Lampau (RPL) Politeknik Negeri
-            Banjarmasin membantu Anda mengkonversi pengalaman profesional
-            menjadi pengakuan akademik resmi.
+            Sistem RPL Politeknik Negeri Banjarmasin membuka jalur bagi Anda yang ingin melanjutkan pendidikan ke jenjang lebih tinggi berdasarkan ijazah yang sudah Anda miliki.
           </p>
         </div>
 

@@ -51,27 +51,27 @@ const steps = [
   {
     icon: FileText,
     title: "Registrasi & Pembayaran",
-    desc: "Daftarkan akun Anda dan lakukan pembayaran biaya pendaftaran untuk mengaktifkan fitur pengisian borang.",
+    desc: "Buat akun dan selesaikan pembayaran biaya pendaftaran untuk mengaktifkan akses pengisian borang.",
   },
   {
     icon: BookOpen,
     title: "Isi Borang & Asesmen Mandiri",
-    desc: "Lengkapi data diri, riwayat, dan lakukan penilaian mandiri (skala 1, 2, 4, 5) terhadap capaian pembelajaran.",
+    desc: "Lengkapi data diri, riwayat pendidikan, dan lakukan penilaian mandiri terhadap capaian pembelajaran Anda.",
   },
   {
     icon: ClipboardCheck,
     title: "Verifikasi Administrasi",
-    desc: "Tim admin memeriksa kelengkapan berkas dan keabsahan dokumen persyaratan awal Anda.",
+    desc: "Tim admin akan memeriksa kelengkapan dan keabsahan dokumen persyaratan yang Anda unggah.",
   },
   {
     icon: Users,
     title: "Evaluasi & Asesmen Asesor",
-    desc: "Asesor melakukan Pra-Asesmen dan Asesmen Tahap 2 (Wawancara/Observasi) untuk validasi kompetensi.",
+    desc: "Asesor akan melakukan pra-asesmen dan asesmen lanjutan berupa wawancara atau observasi untuk memvalidasi kompetensi Anda.",
   },
   {
     icon: Award,
     title: "Pleno & Masa Sanggah",
-    desc: "Keputusan pengakuan SKS di Pleno. Tersedia opsi Sanggah/Banding jika hasil penilaian tidak sesuai.",
+    desc: "Keputusan pengakuan SKS ditetapkan di tahap Pleno. Jika hasil penilaian dirasa kurang sesuai, tersedia mekanisme sanggah yang dapat Anda ajukan.",
   },
 ];
 
@@ -79,12 +79,12 @@ const features = [
   {
     icon: GraduationCap,
     title: "Akui Pengalaman Anda",
-    desc: "Konversi pengalaman kerja dan pelatihan menjadi kredit akademik yang diakui secara nasional.",
+    desc: "Pendidikan yang sudah Anda selesaikan sebelumnya dapat diakui sebagai bagian dari proses akademik di Politeknik Negeri Banjarmasin.",
   },
   {
     icon: BookOpen,
     title: "Proses Transparan",
-    desc: "Pantau status pendaftaran dari awal hingga akhir secara real-time melalui dashboard pribadi.",
+    desc: "Pantau status pendaftaran Anda dari awal hingga selesai melalui dashboard pribadi yang tersedia.",
   },
   {
     icon: Shield,
@@ -205,7 +205,7 @@ function HeroSection() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
-          Pendaftaran RPL Periode 2026 Dibuka
+          Pendaftaran RPL Periode 2026 Telah Dibuka
         </motion.div>
 
         {/* Heading */}
@@ -216,9 +216,9 @@ function HeroSection() {
           animate="visible"
           custom={1}
         >
-          Wujudkan Pengalaman{" "}
+          Lanjutkan Studi Anda ke{" "}
           <span className="bg-gradient-to-r from-primary via-blue-500 to-blue-400 bg-clip-text text-transparent">
-            Menjadi Gelar
+            Jenjang Lebih Tinggi
           </span>
         </motion.h1>
 
@@ -230,9 +230,9 @@ function HeroSection() {
           animate="visible"
           custom={2}
         >
-          Rekognisi Pembelajaran Lampau (RPL) Tipe A1 memungkinkan pengalaman kerja dan
-          pelatihan Anda diakui sebagai kredit akademik untuk melanjutkan pendidikan formal
-          di Politeknik Negeri Banjarmasin.
+          Sudah menyelesaikan pendidikan sebelumnya? Melalui jalur RPL di Politeknik Negeri
+          Banjarmasin, Anda dapat melanjutkan studi ke jenjang berikutnya tanpa harus
+          mengulang dari awal.
         </motion.p>
 
         {/* CTAs */}
@@ -268,9 +268,9 @@ function HeroSection() {
           animate="visible"
         >
           {[
-            { label: "Pendaftar", value: "1.200+" },
-            { label: "Program Studi", value: "8" },
-            { label: "Tingkat Kelulusan", value: "94%" },
+            { label: "Jurusan", value: "5" },
+            { label: "Program Studi", value: "21" },
+            { label: "Kemendikbudristek", value: "Resmi" },
           ].map((s) => (
             <motion.div key={s.label} variants={scaleIn} className="text-center">
               <p className="text-2xl font-bold text-foreground md:text-3xl">
@@ -307,10 +307,9 @@ function AboutSection() {
             Apa Itu RPL?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-            Rekognisi Pembelajaran Lampau (RPL) Tipe A1 adalah proses pengakuan atas
-            capaian pembelajaran seseorang yang diperoleh dari pendidikan formal,
-            nonformal, informal, dan/atau pengalaman kerja untuk melanjutkan pendidikan
-            formal pada jenjang yang lebih tinggi.
+            RPL adalah jalur resmi bagi Anda yang ingin melanjutkan pendidikan ke jenjang
+            lebih tinggi dengan mempertimbangkan ijazah dan pengalaman belajar yang sudah
+            Anda tempuh sebelumnya.
           </p>
         </motion.div>
 
@@ -363,11 +362,10 @@ function StepsSection() {
             Langkah-langkah
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-            Alur Pendaftaran RPL Tipe A1
+            Alur Pendaftaran RPL
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-            Proses pendaftaran RPL Tipe A1 dirancang sistematis berdasarkan pedoman. Berikut
-            tahapan yang perlu Anda lalui.
+            Berikut tahapan pendaftaran RPL yang perlu Anda ikuti secara berurutan.
           </p>
         </motion.div>
 
