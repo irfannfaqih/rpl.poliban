@@ -35,6 +35,7 @@ class ResetPasswordMail extends QueuedMailable
     {
         return new Content(
             view: 'emails.reset_password',
+            text: 'emails.reset_password_text',
         );
     }
 
