@@ -234,7 +234,7 @@ function LoginContent() {
                 <div>
                   <h3 className="text-base font-bold text-foreground">Lupa Kata Sandi?</h3>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Masukkan email Anda dan kami akan mengirimkan kata sandi sementara.
+                    Masukkan email Anda dan kami akan mengirimkan tautan reset kata sandi.
                   </p>
                 </div>
                 <button
@@ -256,7 +256,7 @@ function LoginContent() {
                     <div>
                       <p className="font-semibold text-sm text-foreground">Email Terkirim</p>
                       <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        Jika email <strong>{forgotEmail}</strong> terdaftar, kata sandi sementara telah dikirimkan. Periksa kotak masuk atau folder spam Anda.
+                        Jika email <strong>{forgotEmail}</strong> terdaftar, tautan reset kata sandi telah dikirimkan. Periksa kotak masuk atau folder spam Anda.
                       </p>
                     </div>
                   </div>

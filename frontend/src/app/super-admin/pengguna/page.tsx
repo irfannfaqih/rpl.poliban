@@ -196,10 +196,11 @@ export default function ManajemenPenggunaPage() {
   };
 
   const handleSave = () => {
+    const rawNip = fNip.current?.value.trim() || "";
     const payload: any = {
       nama: fNama.current?.value || "",
       email: fEmail.current?.value || "",
-      nip: fNip.current?.value || null,
+      nip: rawNip && rawNip !== "-" ? rawNip : null,
       role: fRole,
       prodi_id: fProdiId && fProdiId !== "none" ? Number(fProdiId) : null,
       phone: fPhone.current?.value || null,
@@ -428,7 +429,7 @@ export default function ManajemenPenggunaPage() {
                 <Input
                   ref={fNip}
                   defaultValue={editTarget?.nip || ""}
-                  placeholder="198001012005011001"
+                  placeholder="Kosongkan jika belum memiliki NIP"
                   maxLength={18}
                   className={
                     errors.nip && errors.nip.length > 0
@@ -446,6 +447,9 @@ export default function ManajemenPenggunaPage() {
                 {errors.nip && errors.nip.length > 0 && (
                   <p className="text-[10px] text-red-500">{errors.nip[0]}</p>
                 )}
+                <p className="text-[10px] text-muted-foreground">
+                  Biarkan kosong jika pengguna belum memiliki NIP. Jangan isi dengan tanda "-".
+                </p>
               </div>
               <div className="space-y-1.5">
                 <label

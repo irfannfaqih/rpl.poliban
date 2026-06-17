@@ -57,11 +57,20 @@ class PenggunaController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if ($request->has('nip')) {
+            $request->merge(['nip' => $this->normalizeNip($request->input('nip'))]);
+        }
+
         $validated = $request->validate([
             "nama" => "required|string|max:255",
             "email" => "required|email|unique:users,email",
             "password" => "required|string|min:8",
-            "nip" => "nullable|string|max:18|unique:users,nip",
+            "nip" => [
+                "nullable",
+                "string",
+                "max:18",
+                Rule::unique("users", "nip")->whereNotNull("nip"),
+            ],
             "role" => [
                 "required",
                 Rule::in([
@@ -98,10 +107,21 @@ class PenggunaController extends Controller
 
     public function update(Request $request, User $pengguna): JsonResponse
     {
+        if ($request->has('nip')) {
+            $request->merge(['nip' => $this->normalizeNip($request->input('nip'))]);
+        }
+
         $validated = $request->validate([
             "nama" => "sometimes|string|max:255",
             "email" => "sometimes|email|unique:users,email,{$pengguna->id}",
-            "nip" => "nullable|string|max:18|unique:users,nip,{$pengguna->id}",
+            "nip" => [
+                "nullable",
+                "string",
+                "max:18",
+                Rule::unique("users", "nip")
+                    ->ignore($pengguna->id)
+                    ->whereNotNull("nip"),
+            ],
             "role" => [
                 "sometimes",
                 Rule::in([
@@ -197,5 +217,14 @@ class PenggunaController extends Controller
             "message" => "Status pengguna diubah menjadi {$newStatus}",
             "data" => $pengguna->fresh()->load("prodi"),
         ]);
+    }
+
+    private function normalizeNip(mixed $nip): ?string
+    {
+        $normalized = is_string($nip) ? trim($nip) : null;
+
+        return $normalized === null || $normalized === '' || $normalized === '-'
+            ? null
+            : $normalized;
     }
 }
