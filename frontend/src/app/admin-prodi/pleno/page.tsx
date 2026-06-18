@@ -152,6 +152,30 @@ export default function DashboardPlenoPage() {
     }
   };
 
+  const getSumberBadgeClass = (sumber?: string | null) => {
+    switch (sumber) {
+      case "Transkrip":
+        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900";
+      case "AT2":
+        return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-900";
+      case "Pemetaan":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900";
+      case "Manual":
+        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900";
+      default:
+        return "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-800";
+    }
+  };
+
+  const SumberBadge = ({ sumber, detail }: { sumber?: string | null; detail?: string | null }) => (
+    <span
+      title={detail || sumber || "Tidak Ada Basis"}
+      className={`inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${getSumberBadgeClass(sumber)}`}
+    >
+      {sumber || "Tidak Ada Basis"}
+    </span>
+  );
+
   const handleExportExcel = async () => {
     try {
       const response = await api.get('/admin-prodi/pleno/export', { responseType: 'blob' });
@@ -407,7 +431,12 @@ export default function DashboardPlenoPage() {
                           <Badge variant="outline" className="bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-400 border-none font-medium">Tidak</Badge>
                         )}
                       </td>
-                      <td className="px-2 py-3 border-r font-medium">{mk.nilai_a1 || "-"}</td>
+                      <td className="px-2 py-3 border-r">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="font-medium">{mk.nilai_a1 || "-"}</span>
+                          <SumberBadge sumber={mk.sumber_a1} detail={mk.detail_sumber_a1} />
+                        </div>
+                      </td>
                       <td className="px-2 py-3 border-r text-muted-foreground">{mk.bobot_a1 !== null ? Number(mk.bobot_a1).toFixed(1) : "-"}</td>
 
                       {/* Asesor 2 */}
@@ -418,7 +447,12 @@ export default function DashboardPlenoPage() {
                           <Badge variant="outline" className="bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-400 border-none font-medium">Tidak</Badge>
                         )}
                       </td>
-                      <td className="px-2 py-3 border-r font-medium">{mk.nilai_a2 || "-"}</td>
+                      <td className="px-2 py-3 border-r">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="font-medium">{mk.nilai_a2 || "-"}</span>
+                          <SumberBadge sumber={mk.sumber_a2} detail={mk.detail_sumber_a2} />
+                        </div>
+                      </td>
                       <td className="px-2 py-3 border-r text-muted-foreground">{mk.bobot_a2 !== null ? Number(mk.bobot_a2).toFixed(1) : "-"}</td>
 
                       {/* Final */}

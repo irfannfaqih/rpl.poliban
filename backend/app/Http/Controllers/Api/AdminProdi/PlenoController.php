@@ -72,6 +72,7 @@ class PlenoController extends Controller
             "plenoMk.mataKuliah:id,kode,nama,sks",
             "penugasanAsesor.asesor:id,nama",
         ]);
+        $this->decoratePlenoSourceMetadata($pendaftaran);
 
         return response()->json(["data" => $pendaftaran]);
     }
@@ -388,6 +389,63 @@ class PlenoController extends Controller
         return ['tidak_diakui', 'T', 0.00];
     }
 
+    private function decoratePlenoSourceMetadata(Pendaftaran $pendaftaran): void
+    {
+        $tugasA1 = $pendaftaran->penugasanAsesor
+            ->firstWhere("urutan", "asesor_1");
+        $tugasA2 = $pendaftaran->penugasanAsesor
+            ->firstWhere("urutan", "asesor_2");
+
+        $pemetaanA1 = $tugasA1
+            ? PemetaanMk::where("penugasan_asesor_id", $tugasA1->id)
+                ->get()
+                ->keyBy("mk_poliban_id")
+            : collect();
+        $pemetaanA2 = $tugasA2
+            ? PemetaanMk::where("penugasan_asesor_id", $tugasA2->id)
+                ->get()
+                ->keyBy("mk_poliban_id")
+            : collect();
+        $semuaTranskrip = TranskripAsal::where(
+            "pendaftaran_id",
+            $pendaftaran->id,
+        )->get();
+        $at2Scores = $this->at2ScoresByAsesorAndMk($pendaftaran, collect([
+            $tugasA1?->asesor_id,
+            $tugasA2?->asesor_id,
+        ])->filter()->values());
+
+        $pendaftaran->plenoMk->each(function (PlenoMk $plenoMk) use (
+            $pemetaanA1,
+            $pemetaanA2,
+            $semuaTranskrip,
+            $at2Scores,
+            $tugasA1,
+            $tugasA2,
+        ) {
+            $mkId = (int) $plenoMk->mata_kuliah_id;
+            [$sumberA1, $detailA1] = $this->resolveSumberNilai(
+                $pemetaanA1->get($mkId),
+                $semuaTranskrip,
+                $this->at2ScoreFor($at2Scores, $tugasA1?->asesor_id, $mkId),
+                $mkId,
+                $plenoMk,
+            );
+            [$sumberA2, $detailA2] = $this->resolveSumberNilai(
+                $pemetaanA2->get($mkId),
+                $semuaTranskrip,
+                $this->at2ScoreFor($at2Scores, $tugasA2?->asesor_id, $mkId),
+                $mkId,
+                $plenoMk,
+            );
+
+            $plenoMk->setAttribute("sumber_a1", $sumberA1);
+            $plenoMk->setAttribute("sumber_a2", $sumberA2);
+            $plenoMk->setAttribute("detail_sumber_a1", $detailA1);
+            $plenoMk->setAttribute("detail_sumber_a2", $detailA2);
+        });
+    }
+
     /**
      * Ambil nilai AT2 per asesor per mata kuliah.
      *
@@ -441,6 +499,73 @@ class PlenoController extends Controller
         $score = $at2Scores->get($asesorId)?->get($mkId);
 
         return $score === null ? null : (float) $score;
+    }
+
+    /**
+     * Tentukan sumber nilai yang ditampilkan di UI pleno.
+     *
+     * Metadata ini hanya untuk auditability/transparansi, tidak mengubah
+     * hasil kalkulasi pleno.
+     *
+     * @return array{string, string}
+     */
+    private function resolveSumberNilai(
+        ?PemetaanMk $pemetaan,
+        $semuaTranskrip,
+        ?float $nilaiAt2,
+        int $mkId,
+        PlenoMk $plenoMk,
+    ): array {
+        $targetMkId = $pemetaan?->mk_poliban_id ?? $mkId;
+        $transkrip = $semuaTranskrip->firstWhere('mk_poliban_id', $targetMkId);
+
+        if ($transkrip) {
+            $bobotTranskrip = (float) $transkrip->nilai_angka;
+            if ($nilaiAt2 !== null) {
+                [, $hurufAt2, $bobotAt2] = $this->skorKeNilaiPoliban($nilaiAt2);
+                if ($bobotAt2 > $bobotTranskrip) {
+                    return [
+                        'AT2',
+                        "Nilai AT2 per MK {$nilaiAt2} ({$hurufAt2}) lebih tinggi dari transkrip {$transkrip->nilai_huruf}.",
+                    ];
+                }
+            }
+
+            return [
+                'Transkrip',
+                "MK asal {$transkrip->nama_mk} dengan nilai {$transkrip->nilai_huruf} ({$bobotTranskrip}).",
+            ];
+        }
+
+        if ($nilaiAt2 !== null) {
+            [, $hurufAt2] = $this->skorKeNilaiPoliban($nilaiAt2);
+
+            return [
+                'AT2',
+                "Nilai AT2 per MK {$nilaiAt2} ({$hurufAt2}).",
+            ];
+        }
+
+        if ($pemetaan) {
+            $keputusan = str_replace('_', ' ', (string) $pemetaan->keputusan);
+
+            return [
+                'Pemetaan',
+                "Keputusan pemetaan asesor: {$keputusan}.",
+            ];
+        }
+
+        if ($plenoMk->disahkan_oleh || $plenoMk->catatan_pleno) {
+            return [
+                'Manual',
+                'Nilai/keputusan ditetapkan melalui diskusi pleno.',
+            ];
+        }
+
+        return [
+            'Tidak Ada Basis',
+            'Tidak ditemukan transkrip terpetakan, pemetaan asesor, atau AT2 per MK.',
+        ];
     }
 
     /**
