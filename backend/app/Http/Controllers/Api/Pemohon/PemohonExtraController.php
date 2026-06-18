@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Pemohon;
 
 use App\Http\Controllers\Controller;
+use App\Models\MataKuliah;
 use App\Models\PemetaanMk;
 use App\Models\Pendaftaran;
 use App\Models\Sanggah;
@@ -224,7 +225,24 @@ class PemohonExtraController extends Controller
      */
     public function submitSanggah(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $isBatch = $request->has('items');
+        $validated = $request->validate($isBatch ? [
+            'pendaftaran_id' => 'required|exists:pendaftaran,id',
+            'items' => 'required|array|min:1',
+            'items.*.mata_kuliah_id' => [
+                'required',
+                'distinct',
+                Rule::exists('pleno_mk', 'mata_kuliah_id')->where(
+                    fn ($query) => $query->where(
+                        'pendaftaran_id',
+                        $request->input('pendaftaran_id'),
+                    ),
+                ),
+            ],
+            'items.*.alasan' => 'required|string',
+            'bukti_file' => 'nullable|file|max:10240', // 10MB
+            'paham_prosedur' => 'required|accepted', // Wajib menyetujui prosedur banding
+        ] : [
             'pendaftaran_id' => 'required|exists:pendaftaran,id',
             'mata_kuliah_id' => [
                 'required',
@@ -273,33 +291,52 @@ class PemohonExtraController extends Controller
             );
         }
 
+        $items = collect($isBatch ? $validated['items'] : [[
+            'mata_kuliah_id' => $validated['mata_kuliah_id'],
+            'alasan' => $validated['alasan'],
+        ]])->map(fn ($item) => [
+            'mata_kuliah_id' => (int) $item['mata_kuliah_id'],
+            'alasan' => $item['alasan'],
+        ]);
+        $mkIds = $items->pluck('mata_kuliah_id')->all();
+
+        $fallbackAsesorId = $pendaftaran->penugasanAsesor()->value('asesor_id');
+        $items = $items->map(function ($item) use ($pendaftaran, $fallbackAsesorId) {
+            $pemetaan = PemetaanMk::where('mk_poliban_id', $item['mata_kuliah_id'])
+                ->whereHas(
+                    'penugasanAsesor',
+                    fn ($query) => $query->where(
+                        'pendaftaran_id',
+                        $pendaftaran->id,
+                    ),
+                )
+                ->with('penugasanAsesor:id,asesor_id')
+                ->first();
+
+            $item['asesor_id'] = $pemetaan?->penugasanAsesor?->asesor_id
+                ?? $fallbackAsesorId;
+
+            return $item;
+        });
+        abort_if(
+            $items->contains(fn ($item) => ! $item['asesor_id']),
+            409,
+            'Asesor penanggung jawab tidak ditemukan.',
+        );
+
         $path = null;
-        if ($request->hasFile('bukti_file')) {
-            $path = $this->privateStorage->store(
-                $request->file('bukti_file'),
-                "sanggah/{$validated['pendaftaran_id']}",
-            );
-        }
-
-        // Cari asesor yang menilai MK ini via pemetaan_mk — assign sebagai penanggung jawab sanggah
-        $pemetaan = PemetaanMk::where('mk_poliban_id', $validated['mata_kuliah_id'])
-            ->whereHas(
-                'penugasanAsesor',
-                fn ($query) => $query->where(
-                    'pendaftaran_id',
-                    $pendaftaran->id,
-                ),
-            )
-            ->with('penugasanAsesor:id,asesor_id')
-            ->first();
-        $asesorId = $pemetaan?->penugasanAsesor?->asesor_id
-            ?? $pendaftaran->penugasanAsesor()->value('asesor_id');
-        abort_if(! $asesorId, 409, 'Asesor penanggung jawab tidak ditemukan.');
-
         try {
+            if ($request->hasFile('bukti_file')) {
+                $path = $this->privateStorage->store(
+                    $request->file('bukti_file'),
+                    "sanggah/{$validated['pendaftaran_id']}",
+                );
+            }
+
             $sanggah = DB::transaction(function () use (
                 $validated,
-                $asesorId,
+                $items,
+                $mkIds,
                 $path,
             ) {
                 $locked = Pendaftaran::whereKey($validated['pendaftaran_id'])
@@ -316,24 +353,29 @@ class PemohonExtraController extends Controller
                     409,
                     'SK sudah diterbitkan atau tidak tersedia.',
                 );
-                abort_if(
-                    Sanggah::where('pendaftaran_id', $locked->id)
-                        ->where('mata_kuliah_id', $validated['mata_kuliah_id'])
-                        ->lockForUpdate()
-                        ->exists(),
-                    409,
-                    'Sanggahan untuk mata kuliah ini sudah diajukan.',
-                );
 
-                return Sanggah::create([
+                $existingMkIds = Sanggah::where('pendaftaran_id', $locked->id)
+                    ->whereIn('mata_kuliah_id', $mkIds)
+                    ->lockForUpdate()
+                    ->pluck('mata_kuliah_id');
+                if ($existingMkIds->isNotEmpty()) {
+                    $names = MataKuliah::whereIn('id', $existingMkIds)
+                        ->orderBy('kode')
+                        ->get(['kode', 'nama'])
+                        ->map(fn ($mk) => "{$mk->kode} - {$mk->nama}")
+                        ->implode(', ');
+                    abort(409, 'Sanggahan untuk mata kuliah berikut sudah diajukan: '.$names);
+                }
+
+                return $items->map(fn ($item) => Sanggah::create([
                     'pendaftaran_id' => $validated['pendaftaran_id'],
-                    'mata_kuliah_id' => $validated['mata_kuliah_id'],
-                    'asesor_id' => $asesorId,
-                    'alasan' => $validated['alasan'],
+                    'mata_kuliah_id' => $item['mata_kuliah_id'],
+                    'asesor_id' => $item['asesor_id'],
+                    'alasan' => $item['alasan'],
                     'bukti_path' => $path,
                     'paham_prosedur' => true,
                     'status' => 'diajukan',
-                ]);
+                ]))->values();
             });
         } catch (\Throwable $e) {
             $this->privateStorage->delete($path);
@@ -341,7 +383,12 @@ class PemohonExtraController extends Controller
         }
 
         return response()->json(
-            ['message' => 'Sanggah berhasil diajukan', 'data' => $sanggah],
+            [
+                'message' => $sanggah->count() > 1
+                    ? "{$sanggah->count()} sanggahan berhasil diajukan"
+                    : 'Sanggah berhasil diajukan',
+                'data' => $sanggah,
+            ],
             201,
         );
     }

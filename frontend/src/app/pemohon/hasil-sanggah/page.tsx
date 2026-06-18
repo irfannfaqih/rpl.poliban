@@ -26,7 +26,8 @@ export default function HasilSanggahPage() {
   // PRD Bab 3.4: Pemohon wajib klik "Saya Mengerti" sebelum form sanggah terbuka
   const [briefingAcknowledged, setBriefingAcknowledged] = useState(false);
   const [showSanggahForm, setShowSanggahForm] = useState(false);
-  const [sanggahData, setSanggahData] = useState({ mkId: "", alasan: "" });
+  const [selectedMkIds, setSelectedMkIds] = useState<string[]>([]);
+  const [sanggahReasons, setSanggahReasons] = useState<Record<string, string>>({});
   const [buktiFile, setBuktiFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pahamProsedur, setPahamProsedur] = useState(false);
@@ -65,8 +66,13 @@ export default function HasilSanggahPage() {
   }, [canShowFinalResult, pendaftaran]);
 
   const handleSubmitSanggah = async () => {
-    if (!sanggahData.mkId || !sanggahData.alasan) {
-      toast.error("Pilih mata kuliah dan isi alasan sanggahan");
+    if (selectedMkIds.length === 0) {
+      toast.error("Pilih minimal satu mata kuliah yang disanggah");
+      return;
+    }
+    const missingReason = selectedMkIds.find((mkId) => !sanggahReasons[mkId]?.trim());
+    if (missingReason) {
+      toast.error("Isi alasan sanggahan untuk setiap mata kuliah yang dipilih");
       return;
     }
 
@@ -74,8 +80,10 @@ export default function HasilSanggahPage() {
     try {
       const formData = new FormData();
       formData.append("pendaftaran_id", pendaftaran.id.toString());
-      formData.append("mata_kuliah_id", sanggahData.mkId);
-      formData.append("alasan", sanggahData.alasan);
+      selectedMkIds.forEach((mkId, index) => {
+        formData.append(`items[${index}][mata_kuliah_id]`, mkId);
+        formData.append(`items[${index}][alasan]`, sanggahReasons[mkId]);
+      });
       formData.append("paham_prosedur", "1"); // pemohon sudah centang checkbox persetujuan
       if (buktiFile) {
         formData.append("bukti_file", buktiFile);
@@ -89,7 +97,8 @@ export default function HasilSanggahPage() {
 
       toast.success("Sanggahan berhasil diajukan");
       setShowSanggahForm(false);
-      setSanggahData({ mkId: "", alasan: "" });
+      setSelectedMkIds([]);
+      setSanggahReasons({});
       setBuktiFile(null);
       setBriefingAcknowledged(false);
       setPahamProsedur(false);
@@ -121,6 +130,28 @@ export default function HasilSanggahPage() {
     ? new Date() > deadlineSanggah
     : false;
   const canSanggah = hasResults && skStatus === "menunggu_sk" && !isDeadlinePassed;
+  const submittedSanggahMkIds = useMemo(
+    () => new Set((pendaftaran?.sanggah || []).map((s: any) => String(s.mata_kuliah?.id))),
+    [pendaftaran],
+  );
+  const rejectedResults = useMemo(
+    () => results.filter((r: any) => r.status === "Ditolak"),
+    [results],
+  );
+
+  const toggleMkSelection = (mkId: string) => {
+    setSelectedMkIds((prev) => {
+      if (prev.includes(mkId)) {
+        setSanggahReasons((current) => {
+          const next = { ...current };
+          delete next[mkId];
+          return next;
+        });
+        return prev.filter((id) => id !== mkId);
+      }
+      return [...prev, mkId];
+    });
+  };
 
   const sanggahStatusText = useMemo(() => {
     if (!pendaftaran?.sanggah || pendaftaran.sanggah.length === 0) {
@@ -436,7 +467,7 @@ export default function HasilSanggahPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-background rounded-2xl p-5 sm:p-6 w-full max-w-md border shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="bg-background rounded-2xl p-5 sm:p-6 w-full max-w-2xl border shadow-2xl max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-11 w-11 rounded-xl bg-amber-500/10 flex items-center justify-center">
@@ -451,32 +482,18 @@ export default function HasilSanggahPage() {
                   </p>
                 </div>
               </div>
-              <div className="space-y-3 text-xs sm:text-sm text-foreground/80 leading-relaxed bg-muted/30 p-4 rounded-xl border">
-                <p>
-                  <strong className="text-foreground">
-                    Jalur 1 - Sanggahan ke Asesor:
-                  </strong>{" "}
-                  Pemohon mengajukan keberatan langsung ke asesor yang menilai.
-                  Asesor akan mempertimbangkan dan memberikan keputusan final
-                  yang tidak dapat diganggu gugat.
-                </p>
-                <p>
-                  <strong className="text-foreground">Batas Waktu:</strong>{" "}
-                  Sanggahan hanya dapat diajukan dalam masa sanggah yang
-                  ditetapkan oleh program studi.
-                </p>
-                <p>
-                  <strong className="text-foreground">
-                    Dokumen Pendukung:
-                  </strong>{" "}
-                  Sertakan bukti konkret yang relevan dengan CP Mata Kuliah yang
-                  disanggah.
-                </p>
-                <p>
-                  <strong className="text-foreground">Keputusan Mutlak:</strong>{" "}
-                  Keputusan asesor bersifat final dan tidak dapat diajukan
-                  sanggah ulang.
-                </p>
+              <div className="grid gap-3 sm:grid-cols-2 text-xs text-foreground/80 leading-5">
+                {[
+                  ["Jalur Sanggah", "Keberatan ditinjau oleh asesor yang bertugas pada pendaftaran Anda."],
+                  ["Batas Waktu", "Sanggahan hanya dapat diajukan selama masa sanggah masih aktif."],
+                  ["Bukti Pendukung", "Lampirkan bukti baru yang relevan dengan mata kuliah yang disanggah."],
+                  ["Keputusan Final", "Keputusan pertama yang disahkan asesor akan mengunci sanggahan."],
+                ].map(([title, desc]) => (
+                  <div key={title} className="rounded-xl border bg-muted/30 p-3">
+                    <p className="font-bold text-foreground">{title}</p>
+                    <p className="mt-1">{desc}</p>
+                  </div>
+                ))}
               </div>
               {/* Checkbox Persetujuan */}
               <label className="flex items-start gap-3 cursor-pointer mt-3 p-3 rounded-xl border border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors">
@@ -539,38 +556,61 @@ export default function HasilSanggahPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Mata Kuliah Disanggah
+                    Mata Kuliah yang Disanggah
                   </Label>
-                  <select
-                    value={sanggahData.mkId}
-                    onChange={(e) =>
-                      setSanggahData({ ...sanggahData, mkId: e.target.value })
-                    }
-                    className="w-full flex h-10 items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground"
-                  >
-                    <option value="">-- Pilih Mata Kuliah --</option>
-                    {results
-                      .filter((r: any) => r.status === "Ditolak")
-                      .map((r: any, i: number) => (
-                        <option key={i} value={r.mk_id}>
-                          {r.id} - {r.nama}
-                        </option>
-                      ))}
-                  </select>
+                  <div className="max-h-48 overflow-y-auto rounded-xl border bg-muted/20 p-2 space-y-2">
+                    {rejectedResults.map((r: any, i: number) => {
+                      const mkId = String(r.mk_id);
+                      const alreadySubmitted = submittedSanggahMkIds.has(mkId);
+                      const checked = selectedMkIds.includes(mkId);
+                      return (
+                        <label
+                          key={i}
+                          className={`flex items-start gap-3 rounded-lg border bg-background p-3 text-sm transition-colors ${alreadySubmitted ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:border-amber-400"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={alreadySubmitted}
+                            onChange={() => toggleMkSelection(mkId)}
+                            className="mt-0.5 h-4 w-4 rounded border-amber-400 accent-amber-600 shrink-0"
+                          />
+                          <span className="flex-1 min-w-0">
+                            <span className="block font-bold text-foreground">{r.id} - {r.nama}</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {alreadySubmitted ? "Sanggahan untuk MK ini sudah diajukan" : `${r.sks || 0} SKS ditolak`}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Alasan & Referensi Bukti Baru
+                    Alasan Per Mata Kuliah
                   </Label>
-                  <textarea
-                    value={sanggahData.alasan}
-                    onChange={(e) =>
-                      setSanggahData({ ...sanggahData, alasan: e.target.value })
-                    }
-                    className="w-full min-h-[110px] rounded-xl border border-border bg-background px-3 py-3 text-sm transition-all focus:ring-2 focus:ring-primary/20 shadow-sm resize-y text-foreground"
-                    placeholder="Jelaskan secara rinci mengapa Anda menyanggah keputusan ini dan sebutkan bukti tambahan yang mendukung..."
-                  />
+                  {selectedMkIds.length === 0 ? (
+                    <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-center text-xs text-muted-foreground">
+                      Pilih mata kuliah terlebih dahulu untuk mengisi alasan sanggah.
+                    </div>
+                  ) : selectedMkIds.map((mkId) => {
+                    const mk = rejectedResults.find((r: any) => String(r.mk_id) === mkId);
+                    return (
+                      <div key={mkId} className="rounded-xl border bg-background p-3 space-y-2">
+                        <p className="text-xs font-bold text-foreground">{mk?.id} - {mk?.nama}</p>
+                        <textarea
+                          value={sanggahReasons[mkId] || ""}
+                          onChange={(e) =>
+                            setSanggahReasons((prev) => ({ ...prev, [mkId]: e.target.value }))
+                          }
+                          className="w-full min-h-[84px] rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all focus:ring-2 focus:ring-primary/20 shadow-sm resize-y text-foreground"
+                          placeholder="Jelaskan alasan sanggah untuk mata kuliah ini..."
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="p-4 rounded-xl bg-muted/50 border border-dashed border-border flex items-center gap-3 group hover:bg-muted transition-colors cursor-pointer relative">
@@ -608,7 +648,8 @@ export default function HasilSanggahPage() {
                     setShowSanggahForm(false);
                     setBriefingAcknowledged(false);
                     setBuktiFile(null);
-                    setSanggahData({ mkId: "", alasan: "" });
+                    setSelectedMkIds([]);
+                    setSanggahReasons({});
                   }}
                   className="px-6 h-10 rounded-xl text-sm font-semibold"
                 >

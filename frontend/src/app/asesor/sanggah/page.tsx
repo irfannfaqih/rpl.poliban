@@ -33,6 +33,31 @@ export default function SanggahanDashboard() {
     });
   }, [sanggahList, searchTerm]);
 
+  const groupedSanggah = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    filteredSanggah.forEach((s: any) => {
+      const created = s.created_at ? new Date(s.created_at) : new Date(0);
+      created.setSeconds(0, 0);
+      const key = `${s.pendaftaran_id || s.pendaftaran?.id || "unknown"}-${created.toISOString()}`;
+      groups.set(key, [...(groups.get(key) || []), s]);
+    });
+
+    return Array.from(groups.entries()).map(([key, items]) => {
+      const pending = items.filter((s: any) => s.status === "diajukan").length;
+      const accepted = items.filter((s: any) => s.status === "diterima").length;
+      const rejected = items.filter((s: any) => s.status === "ditolak").length;
+      return {
+        key,
+        items,
+        pemohon: items[0]?.pendaftaran?.user?.nama || "Pemohon",
+        createdAt: items[0]?.created_at,
+        pending,
+        accepted,
+        rejected,
+      };
+    });
+  }, [filteredSanggah]);
+
   // Automatically select the first item if none is selected
   const selectedSanggah = useMemo(() => {
     if (selectedId !== null) {
@@ -125,37 +150,54 @@ export default function SanggahanDashboard() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {filteredSanggah.map((s: any) => (
-            <button
-              key={s.id}
-              onClick={() => {
-                setSelectedId(s.id);
-                setReviewNote("");
-                setNewGrade("");
-              }}
-              className={`w-full text-left p-4 rounded-xl border transition-all ${selectedSanggah?.id === s.id
-                ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                : "border-border bg-background hover:bg-muted/50 hover:border-primary/30"
-                }`}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-wider">SNG-{s.id}</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {s.created_at ? new Date(s.created_at).toLocaleDateString("id-ID") : "-"}
+          {groupedSanggah.map((group: any) => (
+            <div key={group.key} className="rounded-xl border bg-background p-3 space-y-3">
+              <div className="flex justify-between items-start gap-3">
+                <div>
+                  <p className="font-bold text-sm text-foreground">{group.pemohon}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Pengajuan Sanggah - {group.items.length} MK
+                  </p>
+                </div>
+                <span className="text-[10px] text-muted-foreground shrink-0">
+                  {group.createdAt ? new Date(group.createdAt).toLocaleDateString("id-ID") : "-"}
                 </span>
               </div>
-              <p className="font-bold text-sm text-foreground">{s.pendaftaran?.user?.nama || "Pemohon"}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{s.mata_kuliah?.nama}</p>
 
-              <div className="mt-3">
-                <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${s.status === "diajukan" ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" :
-                  s.status === "diterima" ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400" :
-                    "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400"
-                  }`}>
-                  {s.status === "diajukan" ? "Menunggu Review" : s.status.toUpperCase()}
-                </span>
+              <div className="flex gap-1.5 flex-wrap">
+                {group.pending > 0 && <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">{group.pending} pending</span>}
+                {group.accepted > 0 && <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400">{group.accepted} diterima</span>}
+                {group.rejected > 0 && <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400">{group.rejected} ditolak</span>}
               </div>
-            </button>
+
+              <div className="space-y-1.5">
+                {group.items.map((s: any) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setSelectedId(s.id);
+                      setReviewNote("");
+                      setNewGrade("");
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-all ${selectedSanggah?.id === s.id
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border bg-muted/20 hover:bg-muted/50 hover:border-primary/30"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-foreground truncate">{s.mata_kuliah?.nama}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${s.status === "diajukan" ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" :
+                        s.status === "diterima" ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400" :
+                          "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400"
+                        }`}>
+                        {s.status === "diajukan" ? "Pending" : s.status}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">SNG-{s.id}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
           {filteredSanggah.length === 0 && (
             <div className="p-8 text-center text-xs text-muted-foreground">
