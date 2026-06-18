@@ -13,16 +13,31 @@ use Illuminate\Support\Facades\DB;
 
 class SanggahController extends Controller
 {
+    private function isAssignedToPendaftaran(int $pendaftaranId, int $asesorId): bool
+    {
+        return Pendaftaran::whereKey($pendaftaranId)
+            ->whereHas(
+                'penugasanAsesor',
+                fn ($query) => $query->where('asesor_id', $asesorId),
+            )
+            ->exists();
+    }
+
     /**
-     * List sanggah yang masuk ke asesor login
+     * List sanggah untuk pendaftaran yang ditangani asesor login.
      */
     public function index(Request $request): JsonResponse
     {
+        $asesorId = $request->user()->id;
+
         $data = Sanggah::with([
             "pendaftaran.user:id,nama",
             "mataKuliah:id,kode,nama,sks",
         ])
-            ->where("asesor_id", $request->user()->id)
+            ->whereHas(
+                "pendaftaran.penugasanAsesor",
+                fn ($query) => $query->where("asesor_id", $asesorId),
+            )
             ->orderByDesc("created_at")
             ->paginate($request->get('per_page', 100));
 
@@ -34,10 +49,12 @@ class SanggahController extends Controller
      */
     public function update(Request $request, Sanggah $sanggah): JsonResponse
     {
-        if ($sanggah->asesor_id !== $request->user()->id) {
+        $asesorId = $request->user()->id;
+        if (! $this->isAssignedToPendaftaran($sanggah->pendaftaran_id, $asesorId)) {
             return response()->json(["message" => "Akses ditolak."], 403);
         }
 
+        $sanggah->loadMissing('pendaftaran.skKeputusan');
         if (
             $sanggah->pendaftaran->status_alur !== 'finished' ||
             $sanggah->pendaftaran->skKeputusan?->status !== 'menunggu_sk'
@@ -54,21 +71,28 @@ class SanggahController extends Controller
                 "required_if:status,diterima|nullable|in:A,AB,B,BC,C,T",
         ]);
 
-        // Gunakan diputus_at sebagai kunci penolakan (PRD Bab 3.4)
-        if ($sanggah->diputus_at !== null) {
+        // First decision wins: keputusan pertama mengunci sanggah untuk semua asesor.
+        if ($sanggah->status !== 'diajukan' || $sanggah->diputus_at !== null) {
             return response()->json(
                 [
                     "message" =>
                         "Sanggahan ini sudah diputus dan tidak bisa diubah.",
                 ],
-                403,
+                409,
             );
         }
 
-        DB::transaction(function () use ($sanggah, $validated) {
+        DB::transaction(function () use ($sanggah, $validated, $asesorId) {
             $pendaftaran = Pendaftaran::whereKey($sanggah->pendaftaran_id)
                 ->lockForUpdate()
                 ->firstOrFail();
+            abort_unless(
+                $pendaftaran->penugasanAsesor()
+                    ->where('asesor_id', $asesorId)
+                    ->exists(),
+                403,
+                'Akses ditolak.',
+            );
             abort_unless(
                 $pendaftaran->status_alur === 'finished',
                 409,
@@ -87,12 +111,7 @@ class SanggahController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
             abort_unless(
-                $locked->asesor_id === request()->user()->id,
-                403,
-                'Akses ditolak.',
-            );
-            abort_if(
-                $locked->diputus_at !== null,
+                $locked->status === 'diajukan' && $locked->diputus_at === null,
                 409,
                 "Sanggahan ini sudah diputus dan tidak bisa diubah.",
             );

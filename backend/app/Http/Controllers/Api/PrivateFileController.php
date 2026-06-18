@@ -41,7 +41,9 @@ class PrivateFileController extends Controller
         $user = $request->user();
         $allowed = match ($user->role) {
             'pemohon' => $sanggah->pendaftaran->user_id === $user->id,
-            'asesor' => $sanggah->asesor_id === $user->id,
+            'asesor' => $sanggah->pendaftaran->penugasanAsesor()
+                ->where('asesor_id', $user->id)
+                ->exists(),
             'admin_prodi' => $sanggah->pendaftaran->prodi_id === $user->prodi_id,
             'super_admin', 'pimpinan' => true,
             default => false,

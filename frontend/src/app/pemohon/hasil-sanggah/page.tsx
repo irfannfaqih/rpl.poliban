@@ -436,14 +436,14 @@ export default function HasilSanggahPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-background rounded-3xl p-8 w-full max-w-lg border shadow-2xl"
+              className="bg-background rounded-2xl p-5 sm:p-6 w-full max-w-md border shadow-2xl max-h-[90vh] overflow-y-auto"
             >
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-14 w-14 rounded-2xl bg-amber-500/10 flex items-center justify-center">
-                  <Info className="h-7 w-7 text-amber-600" />
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-11 w-11 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                  <Info className="h-5 w-5 text-amber-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-xl tracking-tight">
+                  <h3 className="font-bold text-lg tracking-tight">
                     Prosedur Sanggahan
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -451,7 +451,7 @@ export default function HasilSanggahPage() {
                   </p>
                 </div>
               </div>
-              <div className="space-y-4 text-sm text-foreground/80 leading-relaxed bg-muted/30 p-5 rounded-2xl border">
+              <div className="space-y-3 text-xs sm:text-sm text-foreground/80 leading-relaxed bg-muted/30 p-4 rounded-xl border">
                 <p>
                   <strong className="text-foreground">
                     Jalur 1 - Sanggahan ke Asesor:
@@ -479,7 +479,7 @@ export default function HasilSanggahPage() {
                 </p>
               </div>
               {/* Checkbox Persetujuan */}
-              <label className="flex items-start gap-3 cursor-pointer mt-2 p-4 rounded-xl border border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors">
+              <label className="flex items-start gap-3 cursor-pointer mt-3 p-3 rounded-xl border border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors">
                 <input
                   id="cb-paham-prosedur"
                   type="checkbox"
@@ -491,16 +491,16 @@ export default function HasilSanggahPage() {
                   Saya menyatakan telah membaca, memahami, dan menyetujui prosedur sanggah/banding di atas, serta memahami bahwa keputusan asesor bersifat final.
                 </span>
               </label>
-              <div className="flex gap-3 mt-2">
+              <div className="flex gap-3 mt-4">
                 <Button
                   variant="ghost"
-                  className="flex-1 h-12 rounded-xl"
+                  className="flex-1 h-10 rounded-xl"
                   onClick={() => setShowSanggahForm(false)}
                 >
                   Batal
                 </Button>
                 <Button
-                  className="flex-1 h-12 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold disabled:opacity-50"
+                  className="flex-1 h-10 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold disabled:opacity-50"
                   disabled={!pahamProsedur}
                   onClick={() => setBriefingAcknowledged(true)}
                 >
@@ -520,23 +520,23 @@ export default function HasilSanggahPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-background rounded-3xl p-8 w-full max-w-2xl border shadow-2xl my-auto"
+              className="bg-background rounded-2xl p-5 sm:p-6 w-full max-w-xl border shadow-2xl my-auto max-h-[90vh] overflow-y-auto"
             >
-              <div className="flex items-center gap-4 mb-8">
-                <div className="h-14 w-14 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shadow-inner">
-                  <Scale className="h-7 w-7" />
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-11 w-11 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shadow-inner">
+                  <Scale className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-2xl tracking-tight">
+                  <h3 className="font-bold text-xl tracking-tight">
                     Formulir Sanggah
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Ajukan keberatan atas hasil asesmen untuk ditinjau kembali.
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Mata Kuliah Disanggah
@@ -546,7 +546,7 @@ export default function HasilSanggahPage() {
                     onChange={(e) =>
                       setSanggahData({ ...sanggahData, mkId: e.target.value })
                     }
-                    className="w-full flex h-12 items-center justify-between rounded-xl border border-border bg-background px-4 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground"
+                    className="w-full flex h-10 items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground"
                   >
                     <option value="">-- Pilih Mata Kuliah --</option>
                     {results
@@ -568,14 +568,14 @@ export default function HasilSanggahPage() {
                     onChange={(e) =>
                       setSanggahData({ ...sanggahData, alasan: e.target.value })
                     }
-                    className="w-full min-h-[160px] rounded-2xl border border-border bg-background px-4 py-4 text-sm transition-all focus:ring-2 focus:ring-primary/20 shadow-sm resize-none text-foreground"
+                    className="w-full min-h-[110px] rounded-xl border border-border bg-background px-3 py-3 text-sm transition-all focus:ring-2 focus:ring-primary/20 shadow-sm resize-y text-foreground"
                     placeholder="Jelaskan secara rinci mengapa Anda menyanggah keputusan ini dan sebutkan bukti tambahan yang mendukung..."
                   />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-muted/50 border border-dashed border-border flex items-center gap-4 group hover:bg-muted transition-colors cursor-pointer relative">
-                  <div className="h-10 w-10 rounded-xl bg-background flex items-center justify-center shadow-sm text-muted-foreground group-hover:text-primary transition-colors">
-                    <Download className="h-5 w-5 rotate-180" />
+                <div className="p-4 rounded-xl bg-muted/50 border border-dashed border-border flex items-center gap-3 group hover:bg-muted transition-colors cursor-pointer relative">
+                  <div className="h-9 w-9 rounded-lg bg-background flex items-center justify-center shadow-sm text-muted-foreground group-hover:text-primary transition-colors">
+                    <Download className="h-4 w-4 rotate-180" />
                   </div>
                   <div className="flex-1">
                     <p className="text-xs font-bold text-foreground">
@@ -601,7 +601,7 @@ export default function HasilSanggahPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-10">
+              <div className="flex justify-end gap-3 mt-6">
                 <Button
                   variant="ghost"
                   onClick={() => {
@@ -610,14 +610,14 @@ export default function HasilSanggahPage() {
                     setBuktiFile(null);
                     setSanggahData({ mkId: "", alasan: "" });
                   }}
-                  className="px-8 h-12 rounded-xl text-sm font-semibold"
+                  className="px-6 h-10 rounded-xl text-sm font-semibold"
                 >
                   Batal
                 </Button>
                 <Button
                   onClick={handleSubmitSanggah}
                   disabled={submitting}
-                  className="px-10 h-12 rounded-xl text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/20"
+                  className="px-7 h-10 rounded-xl text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/20"
                 >
                   {submitting ? "Mengirim..." : "Kirim Sanggahan"}
                 </Button>
