@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CROSS_TAB_SESSION_MESSAGE } from "@/lib/auth-session";
 import { getRoleDashboard, useAuthStore } from "@/store/useAuthStore";
 import axios from "axios";
 import { AnimatePresence, motion } from "framer-motion";
@@ -64,11 +65,14 @@ function LoginContent() {
   // Pesan berdasarkan reason redirect
   const reason = searchParams.get("reason");
   const sessionExpired = searchParams.get("session_expired");
+  const sessionChanged = searchParams.get("session_changed");
   const infoMessage = sessionExpired
     ? "Sesi Anda telah berakhir. Silakan login kembali."
-    : reason === "inactivity"
-      ? "Anda dikeluarkan karena tidak ada aktivitas selama 2 jam."
-      : null;
+    : sessionChanged
+      ? CROSS_TAB_SESSION_MESSAGE
+      : reason === "inactivity"
+        ? "Anda dikeluarkan karena tidak ada aktivitas selama 2 jam."
+        : null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

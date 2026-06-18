@@ -1,9 +1,17 @@
 "use client";
 
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
+import {
+  AUTH_STORAGE_KEY,
+  AUTH_TOKEN_KEY,
+  CROSS_TAB_SESSION_MESSAGE_KEY,
+  clearWorkflowStorage,
+  markCrossTabSessionChanged,
+} from "@/lib/auth-session";
 import { getRoleDashboard, useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -33,9 +41,42 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   useInactivityLogout();
 
   useEffect(() => {
+    const pendingMessage = sessionStorage.getItem(CROSS_TAB_SESSION_MESSAGE_KEY);
+    if (pendingMessage) {
+      sessionStorage.removeItem(CROSS_TAB_SESSION_MESSAGE_KEY);
+      toast.info(pendingMessage);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (![AUTH_TOKEN_KEY, AUTH_STORAGE_KEY].includes(event.key || "")) {
+        return;
+      }
+
+      if (event.oldValue === event.newValue) {
+        return;
+      }
+
+      clearWorkflowStorage();
+      markCrossTabSessionChanged();
+
+      if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
+        window.location.href = "/auth/login?session_changed=1";
+        return;
+      }
+
+      window.location.reload();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  useEffect(() => {
     async function verify() {
       // Cek langsung ke localStorage karena state Zustand mungkin belum selesai hidrasi (delay SSR)
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (!token) {
         router.replace("/auth/login");
         return;

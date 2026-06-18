@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { AUTH_TOKEN_KEY, clearWorkflowStorage } from "@/lib/auth-session";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -80,8 +81,8 @@ export default function RegisterPage() {
       });
       
       // 2. Set Token automatically (auto login)
-      useAuthStore.getState().clearAuth(); // Clear old sessions (like super_admin)
-      localStorage.setItem("auth_token", regRes.token);
+      clearWorkflowStorage(); // Clear old workflow state without emitting a logout event first
+      localStorage.setItem(AUTH_TOKEN_KEY, regRes.token);
       api.defaults.headers.common["Authorization"] = `Bearer ${regRes.token}`;
       useAuthStore.setState({
         token: regRes.token,

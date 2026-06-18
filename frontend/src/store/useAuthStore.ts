@@ -1,4 +1,9 @@
 import api from "@/lib/api";
+import {
+  AUTH_STORAGE_KEY,
+  AUTH_TOKEN_KEY,
+  clearWorkflowStorage,
+} from "@/lib/auth-session";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -47,20 +52,7 @@ const ROLE_DASHBOARD_MAP: Record<string, string> = {
   super_admin: "/super-admin/gelombang",
 };
 
-export const clearWorkflowStorage = () => {
-  if (typeof window === "undefined") return;
-
-  const keys = [
-    "pendaftaran-storage",
-    "borang-storage",
-    "asesor-storage",
-  ];
-
-  keys.forEach((key) => {
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
-  });
-};
+export { clearWorkflowStorage };
 
 export const getRoleDashboard = (user: User | null): string => {
   if (!user) return "/auth/login";
@@ -89,7 +81,7 @@ export const useAuthStore = create<AuthState>()(
           clearWorkflowStorage();
 
           // Store token separately for API interceptor
-          localStorage.setItem("auth_token", token);
+          localStorage.setItem(AUTH_TOKEN_KEY, token);
 
           set({
             user,
@@ -109,7 +101,7 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // Ignore error, clear auth anyway
         }
-        localStorage.removeItem("auth_token");
+        localStorage.removeItem(AUTH_TOKEN_KEY);
         clearWorkflowStorage();
         set({ user: null, token: null, isAuthenticated: false });
       },
@@ -130,7 +122,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearAuth: () => {
-        localStorage.removeItem("auth_token");
+        localStorage.removeItem(AUTH_TOKEN_KEY);
         clearWorkflowStorage();
         set({ user: null, token: null, isAuthenticated: false });
       },
@@ -139,7 +131,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: "auth-storage",
+      name: AUTH_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,

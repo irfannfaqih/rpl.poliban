@@ -1,5 +1,10 @@
 import axios from "axios";
 import { toast } from "sonner";
+import {
+  AUTH_STORAGE_KEY,
+  AUTH_TOKEN_KEY,
+  clearWorkflowStorage,
+} from "./auth-session";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
@@ -15,7 +20,7 @@ const api = axios.create({
 // Request interceptor — attach token
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -31,14 +36,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== "undefined") {
         if (!window.location.pathname.startsWith("/auth/")) {
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("auth-storage");
-          ["pendaftaran-storage", "borang-storage", "asesor-storage"].forEach(
-            (key) => {
-              localStorage.removeItem(key);
-              sessionStorage.removeItem(key);
-            },
-          );
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+          clearWorkflowStorage();
           window.location.href = "/auth/login?session_expired=1";
         }
       }
