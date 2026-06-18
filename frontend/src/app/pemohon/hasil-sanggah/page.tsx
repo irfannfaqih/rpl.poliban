@@ -128,7 +128,8 @@ export default function HasilSanggahPage() {
   const isDeadlinePassed = deadlineSanggah
     ? new Date() > deadlineSanggah
     : false;
-  const canSanggah = hasResults && skStatus === "menunggu_sk" && !isDeadlinePassed;
+  const hasSanggah = (pendaftaran?.sanggah || []).length > 0;
+  const canSanggah = hasResults && skStatus === "menunggu_sk" && !isDeadlinePassed && !hasSanggah;
   const submittedSanggahMkIds = useMemo(
     () => new Set((pendaftaran?.sanggah || []).map((s: any) => String(s.mata_kuliah?.id))),
     [pendaftaran],
