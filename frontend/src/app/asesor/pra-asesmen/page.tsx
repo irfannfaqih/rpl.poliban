@@ -189,6 +189,26 @@ function PraAsesmenPageContent() {
 
   const isReadOnly = Boolean(task.pra_asesmen?.is_submitted);
   const isRejected = task.pra_asesmen?.rekomendasi === "tidak_memenuhi";
+  const jadwalAsesmen = Array.isArray(task.pendaftaran?.jadwal_asesmen)
+    ? task.pendaftaran.jadwal_asesmen[0]
+    : task.pendaftaran?.jadwal_asesmen;
+  const formatTanggal = (value?: string | null) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+  const formatTanggalWaktu = (value?: string | null) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleString("id-ID");
+  };
 
   const isAllChecked = langkahList.every((l) => localData[l.key] === true || localData[l.key.replace('langkah', 'langkah_')] === true);
   const hasRekomendasi = !!localData.rekomendasi;
@@ -287,7 +307,7 @@ function PraAsesmenPageContent() {
 
 
       {/* Jadwal Pertemuan Card */}
-      {task.pendaftaran?.jadwal_asesmen && (
+      {jadwalAsesmen && (
         <div className="rounded-2xl border bg-card p-6 shadow-sm border-blue-200 dark:border-blue-900/50 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full -z-0" />
           <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-blue-700 dark:text-blue-400 border-b pb-2">
@@ -300,7 +320,7 @@ function PraAsesmenPageContent() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Tanggal</p>
-                <p className="font-semibold">{new Date(task.pendaftaran.jadwal_asesmen.tanggal).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                <p className="font-semibold">{formatTanggal(jadwalAsesmen.tanggal)}</p>
               </div>
             </div>
 
@@ -310,7 +330,7 @@ function PraAsesmenPageContent() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Waktu</p>
-                <p className="font-semibold">{task.pendaftaran.jadwal_asesmen.waktu}</p>
+                <p className="font-semibold">{jadwalAsesmen.waktu || "-"}</p>
               </div>
             </div>
 
@@ -320,11 +340,11 @@ function PraAsesmenPageContent() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Tempat / Lokasi</p>
-                <p className="font-semibold">{task.pendaftaran.jadwal_asesmen.tempat}</p>
+                <p className="font-semibold">{jadwalAsesmen.tempat || "-"}</p>
               </div>
             </div>
 
-            {task.pendaftaran.jadwal_asesmen.link_meeting && (
+            {jadwalAsesmen.link_meeting && (
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
                   <Video className="h-5 w-5" />
@@ -332,7 +352,7 @@ function PraAsesmenPageContent() {
                 <div>
                   <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Link Online Meeting</p>
                   <a
-                    href={task.pendaftaran.jadwal_asesmen.link_meeting}
+                    href={jadwalAsesmen.link_meeting}
                     target="_blank"
                     rel="noreferrer"
                     className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
@@ -381,7 +401,7 @@ function PraAsesmenPageContent() {
           <p className="font-bold mb-1">{isReadOnly ? "Hasil Pra-Asesmen" : "Penting:"}</p>
           <p>
             {isReadOnly
-              ? `Pra-Asesmen ini telah disubmit${task.pra_asesmen?.submitted_at ? ` pada ${new Date(task.pra_asesmen.submitted_at).toLocaleString("id-ID")}` : ""} dan tidak dapat diubah kembali.`
+              ? `Pra-Asesmen ini telah disubmit${formatTanggalWaktu(task.pra_asesmen?.submitted_at) ? ` pada ${formatTanggalWaktu(task.pra_asesmen?.submitted_at)}` : ""} dan tidak dapat diubah kembali.`
               : <>Lengkapi seluruh 8 langkah checklist konsultasi di bawah ini. Semua langkah, rekomendasi, dan catatan <strong>wajib diisi</strong> sebelum Anda dapat menyimpan dan membuka akses ke Workspace Penilaian Portofolio.</>}
           </p>
         </div>

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import api from "@/lib/api";
-import { openPrivateFile, privateDocumentPath } from "@/lib/private-files";
+import { getPrivateFileObjectUrl, privateDocumentPath } from "@/lib/private-files";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Lock, Save } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -213,9 +213,14 @@ export default function EvaluasiPortofolioForm({
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      openPrivateFile(privateDocumentPath(dok.id))
-                    }
+                    onClick={async () => {
+                      try {
+                        const url = await getPrivateFileObjectUrl(privateDocumentPath(dok.id));
+                        onPreview?.(url, dok.file_name || "Dokumen");
+                      } catch {
+                        toast.error("Gagal membuka preview dokumen.");
+                      }
+                    }}
                     className="w-full py-1.5 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center justify-center gap-1"
                   >
                     Buka Dokumen

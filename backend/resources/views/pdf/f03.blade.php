@@ -35,7 +35,19 @@
             : collect();
 
         // Dokumen yang diunggah pemohon (id → nama)
-        $dokumenMap = $pendaftaran->dokumen->mapWithKeys(fn($d) => [$d->id => $d->nama ?? $d->tipe]);
+        $dokumenMap = collect();
+        foreach (($pendaftaran->dokumen ?? collect())->values() as $index => $d) {
+            $label = $d->file_name ?: ($d->deskripsi ?: ucfirst(str_replace('_', ' ', $d->tipe ?? 'Dokumen')));
+            if ($d->id) {
+                $dokumenMap->put((string) $d->id, $label);
+            }
+            if ($d->tipe) {
+                $dokumenMap->put(strtolower($d->tipe), $label);
+            }
+            $dokumenMap->put('DOK-'.($index + 1), $label);
+        }
+        $dokumenMap->put('Ijazah', $dokumenMap->get('ijazah', 'Ijazah Terakhir'));
+        $dokumenMap->put('Transkrip', $dokumenMap->get('transkrip', 'Transkrip Nilai'));
 
         function vatcCell($val) {
             if ($val === true  || $val == 1) return '<span class="vatc-ya">Ya</span>';
@@ -118,7 +130,11 @@
                 $dokIds  = is_array($eval->dokumen_pendukung)
                     ? $eval->dokumen_pendukung
                     : json_decode($eval->dokumen_pendukung ?? '[]', true);
-                $dokNama = collect($dokIds)->map(fn($id) => $dokumenMap[$id] ?? "Dok-{$id}")->implode(', ');
+                $dokNama = collect($dokIds)
+                    ->map(fn($id) => $dokumenMap->get((string) $id)
+                        ?? $dokumenMap->get(strtolower((string) $id))
+                        ?? (string) $id)
+                    ->implode(', ');
 
                 // VATC dari asesor
                 $vatc = $vatcByCpmk->get($eval->cpmk_id);

@@ -37,6 +37,19 @@
 
         $penilaianA1 = $tugasA1 ? $tugasA1->penilaianCpmk->keyBy('cpmk_id') : collect();
         $penilaianA2 = $tugasA2 ? $tugasA2->penilaianCpmk->keyBy('cpmk_id') : collect();
+        $dokumenMap = collect();
+        foreach (($pendaftaran->dokumen ?? collect())->values() as $index => $d) {
+            $label = $d->file_name ?: ($d->deskripsi ?: ucfirst(str_replace('_', ' ', $d->tipe ?? 'Dokumen')));
+            if ($d->id) {
+                $dokumenMap->put((string) $d->id, $label);
+            }
+            if ($d->tipe) {
+                $dokumenMap->put(strtolower($d->tipe), $label);
+            }
+            $dokumenMap->put('DOK-'.($index + 1), $label);
+        }
+        $dokumenMap->put('Ijazah', $dokumenMap->get('ijazah', 'Ijazah Terakhir'));
+        $dokumenMap->put('Transkrip', $dokumenMap->get('transkrip', 'Transkrip Nilai'));
 
         // Kumpulkan semua CPMK yang dinilai asesor ditambah yang diajukan pemohon
         $cpmkEvaluasi = collect($pendaftaran->evaluasiDiri ?? [])->pluck('cpmk_id');
@@ -112,14 +125,17 @@
                     $dokIds      = is_array($evalDiri?->dokumen_pendukung)
                         ? $evalDiri->dokumen_pendukung
                         : json_decode($evalDiri?->dokumen_pendukung ?? '[]', true);
-                    $dokumenMap  = $pendaftaran->dokumen->mapWithKeys(fn($d) => [$d->id => $d->nama ?? $d->tipe]);
-                    $dokNama     = collect($dokIds)->map(fn($id) => $dokumenMap[$id] ?? "Dok-{$id}")->implode(', ');
+                    $dokNama     = collect($dokIds)
+                        ->map(fn($id) => $dokumenMap->get((string) $id)
+                            ?? $dokumenMap->get(strtolower((string) $id))
+                            ?? (string) $id)
+                        ->implode(', ');
                 @endphp
                 <tr>
                     <td class="text-center">{{ $no++ }}</td>
                     <td>{{ $mk->nama ?? '-' }}<br><small style="">{{ $mk->kode ?? '' }}</small></td>
                     <td>{{ $cpmk->deskripsi ?? $cpmk->kode ?? '-' }}</td>
-                    <td style="font-size:8px;">{{ $dokNama ?: 'Portofolio' }}</td>
+                    <td style="font-size:8px;">{{ $dokNama ?: '-' }}</td>
                     <td class="text-center">
                         @if($nilai === 'diakui') <span class="badge-diakui"><span style="font-family: DejaVu Sans, sans-serif;">&#10004;</span></span> @endif
                     </td>

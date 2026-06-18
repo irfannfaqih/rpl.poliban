@@ -24,7 +24,7 @@ class PdfService
         // F03 - Asesmen Mandiri (evaluasi diri + VATC asesor + dokumen bukti)
         'F03' => [
             'dataDiri', 'prodi', 'evaluasiDiri.cpmk.mataKuliah', 'dokumen',
-            'penugasanAsesor.asesor', 'penugasanAsesor.penilaianCpmk.cpmk',
+            'penugasanAsesor.asesor', 'penugasanAsesor.penilaianCpmk.cpmk.mataKuliah',
         ],
 
         // F04 - Evaluasi Portofolio (evaluasi portofolio asesor)
@@ -35,8 +35,8 @@ class PdfService
 
         // F05 - Asesmen Capaian Pembelajaran (penilaian CPMK kedua asesor)
         'F05' => [
-            'prodi', 'evaluasiDiri.cpmk', 'dokumen',
-            'penugasanAsesor.asesor', 'penugasanAsesor.penilaianCpmk.cpmk',
+            'prodi', 'evaluasiDiri.cpmk.mataKuliah', 'dokumen',
+            'penugasanAsesor.asesor', 'penugasanAsesor.penilaianCpmk.cpmk.mataKuliah',
         ],
 
         // F06 - Tanda Terima Portofolio

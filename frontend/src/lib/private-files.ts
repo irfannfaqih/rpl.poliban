@@ -1,8 +1,12 @@
 import api from "@/lib/api";
 
-export async function openPrivateFile(path: string): Promise<void> {
+export async function getPrivateFileObjectUrl(path: string): Promise<string> {
   const response = await api.get(path, { responseType: "blob" });
-  const objectUrl = URL.createObjectURL(response.data);
+  return URL.createObjectURL(response.data);
+}
+
+export async function openPrivateFile(path: string): Promise<void> {
+  const objectUrl = await getPrivateFileObjectUrl(path);
   const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
 
   if (!opened) {

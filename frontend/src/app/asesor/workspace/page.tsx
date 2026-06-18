@@ -51,6 +51,24 @@ function AsesorWorkspaceContent() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (activePreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(activePreviewUrl);
+      }
+    };
+  }, [activePreviewUrl]);
+
+  const setDocumentPreview = (url: string | null, name: string | null = null) => {
+    setActivePreviewUrl((current) => {
+      if (current?.startsWith("blob:") && current !== url) {
+        URL.revokeObjectURL(current);
+      }
+      return url;
+    });
+    setActivePreviewName(name);
+  };
+
   // Mutation Submit Final
   const submitFinalMutation = useMutation({
     mutationFn: async () => {
@@ -349,7 +367,7 @@ function AsesorWorkspaceContent() {
                     tugas={task} 
                     onLocalChange={setLocalPortofolioCount} 
                     onRegisterSave={(fn) => { savePortofolioRef.current = fn; }} 
-                    onPreview={(url, name) => { setActivePreviewUrl(url); setActivePreviewName(name); }}
+                    onPreview={setDocumentPreview}
                   />
                 </div>
                 <div className={activeTab === "cpmk" ? "block" : "hidden"}>
@@ -357,7 +375,7 @@ function AsesorWorkspaceContent() {
                     tugas={task} 
                     onLocalChange={setLocalCpmkCount} 
                     onRegisterSave={(fn) => { saveCpmkRef.current = fn; }} 
-                    onPreview={(url, name) => { setActivePreviewUrl(url); setActivePreviewName(name); }}
+                    onPreview={setDocumentPreview}
                   />
                 </div>
                 <div className={activeTab === "pemetaan" ? "block" : "hidden"}>
@@ -387,7 +405,7 @@ function AsesorWorkspaceContent() {
                   </span>
                 </div>
                 {activePreviewUrl && (
-                  <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => { setActivePreviewUrl(null); setActivePreviewName(null); }}>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => setDocumentPreview(null)}>
                     Tutup Preview
                   </Button>
                 )}

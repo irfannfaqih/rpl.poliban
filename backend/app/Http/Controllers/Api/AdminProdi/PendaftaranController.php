@@ -64,7 +64,7 @@ class PendaftaranController extends Controller
             "riwayatPendidikan",
             "transkripAsal",
             "pengalamanKerja",
-            "evaluasiDiri.cpmk",
+            "evaluasiDiri.cpmk.mataKuliah",
             "dokumen",
             "penugasanAsesor.asesor:id,nama",
             "penugasanAsesor.pemetaanMk.mkPoliban",

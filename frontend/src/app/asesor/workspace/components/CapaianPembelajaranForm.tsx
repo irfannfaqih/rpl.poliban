@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import api from "@/lib/api";
-import { openPrivateFile, privateDocumentPath } from "@/lib/private-files";
+import { getPrivateFileObjectUrl, privateDocumentPath } from "@/lib/private-files";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Lock, Save, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -294,9 +294,14 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
                                       <button
                                         key={i}
                                         type="button"
-                                        onClick={() =>
-                                          openPrivateFile(privateDocumentPath(doc.id))
-                                        }
+                                        onClick={async () => {
+                                          try {
+                                            const url = await getPrivateFileObjectUrl(privateDocumentPath(doc.id));
+                                            onPreview?.(url, doc.file_name || "Dokumen");
+                                          } catch {
+                                            toast.error("Gagal membuka preview dokumen.");
+                                          }
+                                        }}
                                         className="inline-flex items-center gap-1.5 bg-background border px-2.5 py-1 rounded-md text-[10px] font-bold hover:border-primary hover:text-primary transition-colors shadow-sm"
                                       >
                                         <ExternalLink className="h-3 w-3 text-muted-foreground" />

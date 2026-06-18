@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { dataProdi } from "@/data/prodi";
 import api from "@/lib/api";
 import { openPrivateFile, privateDocumentPath } from "@/lib/private-files";
 import { useQuery } from "@tanstack/react-query";
@@ -40,8 +39,18 @@ export default function ArsipPage() {
     setOpenSection(openSection === section ? "" : section);
   };
 
-  const prodiId = pendaftaran?.prodi?.kode;
-  const selectedProdi = useMemo(() => dataProdi.find(p => p.id === prodiId), [prodiId]);
+  const dokumenLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (pendaftaran?.dokumen || []).forEach((doc: any, index: number) => {
+      const label = doc.file_name || doc.deskripsi || doc.tipe || `Dokumen ${index + 1}`;
+      if (doc.id) map[String(doc.id)] = label;
+      if (doc.tipe) map[String(doc.tipe).toLowerCase()] = label;
+      map[`DOK-${index + 1}`] = label;
+    });
+    map.Ijazah = map.ijazah || "Ijazah Terakhir";
+    map.Transkrip = map.transkrip || "Transkrip Nilai";
+    return map;
+  }, [pendaftaran?.dokumen]);
 
   if (isLoading) {
     return (
@@ -65,7 +74,7 @@ export default function ArsipPage() {
       noHP: pendaftaran?.data_diri?.no_hp,
       emailPribadi: pendaftaran?.data_diri?.email_pribadi,
       alamat: pendaftaran?.data_diri?.alamat,
-      pasFoto: !!pendaftaran?.data_diri?.pas_foto
+      pasFoto: pendaftaran?.data_diri?.pas_foto_path || pendaftaran?.user?.photo || ""
     },
     sectionB: {
       items: pendaftaran?.riwayat_pendidikan?.map((rp: any) => ({
@@ -137,9 +146,7 @@ export default function ArsipPage() {
         <div className="flex flex-col md:flex-row gap-6 items-start">
           <div className="h-32 w-32 rounded-2xl bg-muted border-2 border-border overflow-hidden flex items-center justify-center shrink-0">
             {d.pasFoto ? (
-              <div className="relative h-full w-full flex items-center justify-center bg-primary/5 text-primary text-2xl font-bold">
-                {d.namaLengkap?.charAt(0)}
-              </div>
+              <img src={`/storage/${d.pasFoto}`} alt={d.namaLengkap || "Foto pemohon"} className="h-full w-full object-cover" />
             ) : (
               <User className="h-12 w-12 text-muted-foreground/30" />
             )}
@@ -374,7 +381,7 @@ export default function ArsipPage() {
                               </span>
                               {evalData.dokumenPendukung?.map((docId: string) => (
                                 <span key={docId} className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border/50 flex items-center gap-1">
-                                  <File className="h-2.5 w-2.5" /> {docId}
+                                  <File className="h-2.5 w-2.5" /> {dokumenLabelMap[String(docId)] || dokumenLabelMap[String(docId).toLowerCase()] || docId}
                                 </span>
                               ))}
                             </div>

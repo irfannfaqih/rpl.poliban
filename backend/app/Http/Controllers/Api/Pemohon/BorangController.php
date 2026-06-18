@@ -85,18 +85,19 @@ class BorangController extends Controller
             ]);
         } elseif ($view === 'archive') {
             $query->with([
-                'user:id,nama,email',
+                'user:id,nama,email,photo',
                 'gelombang:id,nama',
                 'prodi:id,kode,nama,jenjang',
                 'prodi.mataKuliah' => fn ($relation) => $relation
                     ->select(['id', 'prodi_id', 'kode', 'nama', 'sks'])
                     ->where('is_active', true)
+                    ->with(['cpmk' => fn ($cpmk) => $cpmk->orderBy('kode')])
                     ->orderBy('nama'),
                 'dataDiri',
                 'riwayatPendidikan',
                 'transkripAsal',
                 'pengalamanKerja',
-                'evaluasiDiri.cpmk',
+                'evaluasiDiri.cpmk.mataKuliah',
                 'dokumen',
             ]);
         } else {
