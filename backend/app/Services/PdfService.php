@@ -128,6 +128,13 @@ class PdfService
      */
     public function generateDocumentPdf(Pendaftaran $pendaftaran, string $documentId)
     {
+        $documentId = strtoupper($documentId);
+        if ($documentId === 'F13') {
+            throw new \InvalidArgumentException(
+                'F13 Matriks Asesmen MK dinonaktifkan karena belum dipakai workflow asesmen.',
+            );
+        }
+
         // ── 1. Load HANYA relasi yang dibutuhkan formulir ini ──────────────────
         $relasi = self::RELASI_PER_FORMULIR[$documentId] ?? self::RELASI_DASAR;
         $pendaftaran->loadMissing($relasi);

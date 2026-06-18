@@ -325,21 +325,17 @@ export default function KurikulumPage() {
     <div className="p-8 max-w-7xl mx-auto space-y-8 pb-20">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-foreground">
-          Kurikulum & Matriks Asesmen
+          Kurikulum
         </h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          Kelola daftar mata kuliah RPL dan tentukan metode asesmen (C1-C11)
-          untuk masing-masing mata kuliah.
+          Kelola daftar mata kuliah RPL dan CPMK program studi.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+        <TabsList className="grid w-full grid-cols-1 max-w-[220px]">
           <TabsTrigger value="kurikulum" className="text-sm font-medium">
             Daftar Kurikulum
-          </TabsTrigger>
-          <TabsTrigger value="matriks" className="text-sm font-medium">
-            Matriks Asesmen MK
           </TabsTrigger>
         </TabsList>
 

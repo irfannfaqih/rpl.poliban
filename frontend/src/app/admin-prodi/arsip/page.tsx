@@ -18,7 +18,7 @@ import { openPrivateFile, privateArchivePath } from "@/lib/private-files";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-// Definition of 19 forms
+// F13 dinonaktifkan sementara karena Matriks Asesmen MK belum dipakai workflow.
 const dokumenMaster = [
   { id: "F01", nama: "Aplikasi RPL", isAuto: true, isRequired: true },
   { id: "F02", nama: "Pra Asesmen", isAuto: true, isRequired: true },
@@ -32,7 +32,6 @@ const dokumenMaster = [
   { id: "F10", nama: "Lembar Jawaban Tulis", isAuto: true, isRequired: true },
   { id: "F11", nama: "Lembar Pertanyaan Lisan", isAuto: true, isRequired: true },
   { id: "F12", nama: "Matriks Alih Kredit Pemohon RPL", isAuto: false, isRequired: true },
-  { id: "F13", nama: "Matriks Asesmen MK", isAuto: true, isRequired: true },
   { id: "F14", nama: "Rekap Asesmen Prodi", isAuto: false, isRequired: true },
   { id: "F15", nama: "Rekap Asesmen Pemohon", isAuto: false, isRequired: true },
   { id: "F16", nama: "Daftar Riwayat Hidup", isAuto: true, isRequired: true },
@@ -151,7 +150,7 @@ export default function LokerArsipPage() {
       <div>
         <h1 className="text-xl font-bold tracking-tight text-foreground">Loker Arsip Dokumen</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          Kelola 19 dokumen fisik/digital untuk setiap pemohon. Upload scan dokumen yang membutuhkan tanda tangan basah.
+          Kelola dokumen fisik/digital untuk setiap pemohon. Upload scan dokumen yang membutuhkan tanda tangan basah.
         </p>
       </div>
 

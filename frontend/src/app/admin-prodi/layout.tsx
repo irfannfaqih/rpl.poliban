@@ -64,7 +64,7 @@ const sidebarLinks = [
   { href: "/admin-prodi/dashboard", label: "Antrean Pendaftar", icon: Users },
   {
     href: "/admin-prodi/kurikulum",
-    label: "Kurikulum & Matriks",
+    label: "Kurikulum",
     icon: BookOpen,
   },
   { href: "/admin-prodi/jadwal", label: "Jadwal Asesmen", icon: CalendarDays },

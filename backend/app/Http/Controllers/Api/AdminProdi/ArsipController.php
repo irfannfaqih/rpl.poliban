@@ -123,6 +123,13 @@ class ArsipController extends Controller
     {
         $this->authorize('view', $pendaftaran);
 
+        if (strtoupper((string) $kode) === 'F13') {
+            return response()->json([
+                'status' => 'disabled',
+                'message' => 'F13 Matriks Asesmen MK dinonaktifkan karena belum dipakai workflow asesmen.',
+            ], 410);
+        }
+
         try {
             // Generate PDF menggunakan service
             $pdf = $pdfService->generateDocumentPdf($pendaftaran, $kode);
