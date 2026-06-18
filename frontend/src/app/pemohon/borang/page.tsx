@@ -57,13 +57,11 @@ export default function BorangPage() {
   const {
     activeSection,
     setActiveSection,
-    touchedSections,
     validateSection,
     lastSaved
   } = useBorangStore(useShallow((state) => ({
     activeSection: state.activeSection,
     setActiveSection: state.setActiveSection,
-    touchedSections: state.touchedSections,
     validateSection: state.validateSection,
     lastSaved: state.lastSaved,
   })));
@@ -144,21 +142,43 @@ export default function BorangPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Intersection Observer for scroll-spy
+  // Scroll-spy: pilih section yang sedang berada paling dekat dengan area baca.
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        }
-      },
-      { rootMargin: "-20% 0px -60% 0px", threshold: 0.1 }
-    );
+    const updateActiveSection = () => {
+      const anchorY = 112;
+      let nextSection = sections[0].id;
+      let closestDistance = Number.POSITIVE_INFINITY;
 
-    observerRefs.current.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+      for (const section of sections) {
+        const el = observerRefs.current.get(section.id);
+        if (!el) continue;
+
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= anchorY && rect.bottom > anchorY) {
+          nextSection = section.id;
+          break;
+        }
+
+        const distance = Math.abs(rect.top - anchorY);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          nextSection = section.id;
+        }
+      }
+
+      if (useBorangStore.getState().activeSection !== nextSection) {
+        setActiveSection(nextSection);
+      }
+    };
+
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+
+    return () => {
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+    };
   }, [setActiveSection]);
 
   const setRef = useCallback((id: string, el: HTMLDivElement | null) => {
@@ -167,6 +187,7 @@ export default function BorangPage() {
 
   const scrollToSection = (id: string) => {
     const el = observerRefs.current.get(id);
+    setActiveSection(id);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -178,6 +199,8 @@ export default function BorangPage() {
     const allValid = sections.every(s => validateSection(s.id, prodiId));
     if (!allValid) {
       setShowError(true);
+      const firstInvalid = sections.find(s => !validateSection(s.id, prodiId));
+      if (firstInvalid) scrollToSection(firstInvalid.id);
       setTimeout(() => setShowError(false), 5000);
       return;
     }
@@ -426,33 +449,36 @@ export default function BorangPage() {
             {sections.map((section) => {
               const isActive = activeSection === section.id;
               const isValid = validateSection(section.id, prodiId);
-              const isTouched = touchedSections.includes(section.id);
-
-              let statusColorClass = "text-muted-foreground";
+              const hasError = showError && !isValid;
               let iconBgClass = "bg-muted text-muted-foreground";
 
               if (isValid) {
-                statusColorClass = "text-green-600";
                 iconBgClass = "bg-green-100 text-green-600";
+              } else if (hasError) {
+                iconBgClass = "bg-red-100 text-red-600";
               }
 
               return (
                 <button
                   key={section.id}
                   onClick={() => scrollToSection(section.id)}
-                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition-all ${isActive
-                      ? "bg-primary/5 text-primary font-bold shadow-sm"
-                      : "text-foreground/70 hover:bg-muted"
+                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition-all ${hasError
+                      ? "bg-red-50 text-red-700 ring-1 ring-red-200"
+                      : isActive
+                        ? "bg-primary/5 text-primary font-bold shadow-sm"
+                        : "text-foreground/70 hover:bg-muted"
                     }`}
                 >
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${isActive && !isValid
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${isActive && !isValid && !hasError
                         ? "bg-primary text-primary-foreground"
                         : iconBgClass
                       }`}
                   >
                     {isValid ? (
                       <CheckCircle2 className="h-4 w-4" />
+                    ) : hasError ? (
+                      <AlertCircle className="h-4 w-4" />
                     ) : (
                       <section.icon className={`h-4 w-4 ${isActive ? "animate-pulse" : ""}`} />
                     )}
@@ -462,6 +488,8 @@ export default function BorangPage() {
                   </span>
                   {isValid ? (
                     <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                  ) : hasError ? (
+                    <AlertCircle className="h-3.5 w-3.5 text-red-500" />
                   ) : isActive ? (
                     <ChevronRight className="h-3.5 w-3.5 text-primary" />
                   ) : null}
