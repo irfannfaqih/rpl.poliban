@@ -27,6 +27,19 @@ class UjiLanjutanController extends Controller
             ->first();
     }
 
+    private function isReadableAt2(Pendaftaran $pendaftaran): bool
+    {
+        if ($pendaftaran->status_alur === 'asesmen_tahap2') {
+            return true;
+        }
+
+        return in_array(
+            $pendaftaran->ujiLanjutan?->fase_tulis,
+            ['selesai', 'tidak_hadir'],
+            true,
+        );
+    }
+
     // ─── Index ────────────────────────────────────────────────────────────────
 
     public function index(Request $request): JsonResponse
@@ -40,7 +53,13 @@ class UjiLanjutanController extends Controller
                 "catatanAsesor" => fn($q2) => $q2->where("asesor_id", $asesorId)
             ]),
         ])
-            ->where("status_alur", "asesmen_tahap2")
+            ->where(function ($query) {
+                $query->where("status_alur", "asesmen_tahap2")
+                    ->orWhereHas("ujiLanjutan", fn($uji) => $uji->whereIn(
+                        "fase_tulis",
+                        ["selesai", "tidak_hadir"],
+                    ));
+            })
             ->whereHas("penugasanAsesor", fn($q) => $q->where("asesor_id", $asesorId))
             ->paginate($request->get('per_page', 100));
 
@@ -56,23 +75,27 @@ class UjiLanjutanController extends Controller
         if (!$this->getAsesorTugas((int) $id, $asesorId)) {
             return response()->json(["message" => "Anda tidak ditugaskan untuk pendaftaran ini."], 403);
         }
+
+        $pendaftaran = Pendaftaran::with("ujiLanjutan")->findOrFail($id);
         abort_unless(
-            Pendaftaran::whereKey($id)
-                ->where('status_alur', 'asesmen_tahap2')
-                ->exists(),
+            $this->isReadableAt2($pendaftaran),
             409,
             'Pendaftaran tidak berada pada tahap AT2.',
         );
 
-        $ujiLanjutan = UjiLanjutan::firstOrCreate(
-            ["pendaftaran_id" => $id],
-            [
-                "status"     => "menjadwalkan",
-                "fase_tulis" => "buat_soal",
-                "dibuat_oleh" => $asesorId,
-                "updated_by"  => $asesorId,
-            ]
-        );
+        $ujiLanjutan = $pendaftaran->ujiLanjutan;
+        if (!$ujiLanjutan && $pendaftaran->status_alur === 'asesmen_tahap2') {
+            $ujiLanjutan = UjiLanjutan::firstOrCreate(
+                ["pendaftaran_id" => $id],
+                [
+                    "status"     => "menjadwalkan",
+                    "fase_tulis" => "buat_soal",
+                    "dibuat_oleh" => $asesorId,
+                    "updated_by"  => $asesorId,
+                ]
+            );
+        }
+        abort_unless($ujiLanjutan, 404, 'Data AT2 belum tersedia.');
 
         $ujiLanjutan->load([
             "pendaftaran.user:id,nama",

@@ -202,6 +202,7 @@ function UjiLanjutanFormContent() {
   const isLocked = !["buat_soal", "menunggu_jawaban"].includes(faseTulis);
   const isSelesai = faseTulis === "selesai";
   const isTidakHadir = faseTulis === "tidak_hadir";
+  const isResultReadOnly = isSelesai || isTidakHadir;
   const mkPolibanList: MataKuliah[] = ujiLanjutan?.pendaftaran?.prodi?.mata_kuliah || [];
 
   // Info jadwal (set oleh Admin Prodi)
@@ -825,13 +826,18 @@ function UjiLanjutanFormContent() {
               <div className="px-5 py-3 bg-muted/20 border-b flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Instrumen Diterbitkan</p>
-                  {!ujianDimulaiAt && (
+                  {!ujianDimulaiAt && !isResultReadOnly && (
                     <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
                       Masih bisa direvisi hingga Anda mengklik "Mulai Ujian"
                     </p>
                   )}
+                  {isResultReadOnly && (
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      AT2 sudah selesai. Instrumen ditampilkan dalam mode baca.
+                    </p>
+                  )}
                 </div>
-                {!ujianDimulaiAt && (
+                {!ujianDimulaiAt && !isResultReadOnly && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -845,7 +851,7 @@ function UjiLanjutanFormContent() {
               </div>
 
               {/* Ringkasan instrumen */}
-              {!showEditInstrumen && (
+              {(!showEditInstrumen || isResultReadOnly) && (
                 <div className="p-5 space-y-2">
                   {mkGroups.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Belum ada instrumen.</p>
@@ -864,7 +870,7 @@ function UjiLanjutanFormContent() {
 
               {/* Editor instrumen (inline) */}
               <AnimatePresence>
-                {showEditInstrumen && !ujianDimulaiAt && (
+                {showEditInstrumen && !ujianDimulaiAt && !isResultReadOnly && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
