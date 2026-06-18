@@ -58,13 +58,22 @@ export default function SanggahanDashboard() {
     });
   }, [filteredSanggah]);
 
-  // Automatically select the first item if none is selected
-  const selectedSanggah = useMemo(() => {
+  const selectedGroup = useMemo(() => {
     if (selectedId !== null) {
-      return sanggahList.find((s: any) => s.id === selectedId) || null;
+      return groupedSanggah.find((group: any) =>
+        group.items.some((s: any) => s.id === selectedId),
+      ) || null;
     }
-    return sanggahList[0] || null;
-  }, [sanggahList, selectedId]);
+    return groupedSanggah[0] || null;
+  }, [groupedSanggah, selectedId]);
+
+  const selectedSanggah = useMemo(() => {
+    if (!selectedGroup) return null;
+    if (selectedId !== null) {
+      return selectedGroup.items.find((s: any) => s.id === selectedId) || selectedGroup.items[0] || null;
+    }
+    return selectedGroup.items[0] || null;
+  }, [selectedGroup, selectedId]);
 
   const decideMutation = useMutation({
     mutationFn: async ({ status, respon_asesor, nilai_mutu_baru }: { status: "diterima" | "ditolak", respon_asesor: string, nilai_mutu_baru?: string }) => {
@@ -209,50 +218,87 @@ export default function SanggahanDashboard() {
 
       {/* Right Detail Pane */}
       <div className="flex-1 flex flex-col bg-card rounded-2xl border shadow-sm overflow-hidden">
-        {selectedSanggah ? (
+        {selectedGroup ? (
           <>
             <div className="p-6 border-b flex justify-between items-center bg-muted/10">
               <div>
-                <h2 className="text-xl font-bold">{selectedSanggah.pendaftaran?.user?.nama || "Pemohon"}</h2>
-                <p className="text-sm text-muted-foreground mt-1">Mengajukan sanggah untuk MK: <strong className="text-foreground">{selectedSanggah.mata_kuliah?.nama}</strong></p>
+                <h2 className="text-xl font-bold">{selectedGroup.pemohon}</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Pengajuan sanggah berisi <strong className="text-foreground">{selectedGroup.items.length} mata kuliah</strong>
+                </p>
               </div>
-              <span className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${selectedSanggah.status === "diajukan" ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400" :
-                selectedSanggah.status === "diterima" ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400" :
-                  "bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400"
-                }`}>
-                Status: {selectedSanggah.status === "diajukan" ? "Menunggu Review" : selectedSanggah.status.toUpperCase()}
-              </span>
+              <div className="flex gap-2 flex-wrap justify-end">
+                {selectedGroup.pending > 0 && <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400">{selectedGroup.pending} Pending</span>}
+                {selectedGroup.accepted > 0 && <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400">{selectedGroup.accepted} Diterima</span>}
+                {selectedGroup.rejected > 0 && <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400">{selectedGroup.rejected} Ditolak</span>}
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold border-b pb-2 text-foreground">Mata Kuliah dalam Pengajuan</h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {selectedGroup.items.map((s: any) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(s.id);
+                        setReviewNote("");
+                        setNewGrade("");
+                      }}
+                      className={`text-left rounded-xl border p-4 transition-all ${selectedSanggah?.id === s.id ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "bg-background hover:border-primary/40"}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-bold text-sm text-foreground">{s.mata_kuliah?.nama}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">SNG-{s.id}</p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md shrink-0 ${s.status === "diajukan" ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" :
+                          s.status === "diterima" ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400" :
+                            "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400"
+                          }`}>
+                          {s.status === "diajukan" ? "Pending" : s.status}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Alasan & Bukti */}
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-bold border-b pb-2 mb-3 text-foreground">Alasan Sanggahan</h3>
+                  <h3 className="text-sm font-bold border-b pb-2 mb-3 text-foreground">Alasan Sanggahan MK Terpilih</h3>
                   <div className="bg-muted/30 p-4 rounded-xl border text-sm leading-relaxed text-foreground/80 font-medium">
                     "{selectedSanggah.alasan}"
                   </div>
                 </div>
 
-                {selectedSanggah.bukti_path && (
+                {selectedSanggah?.bukti_files?.length > 0 && (
                   <div>
                     <h3 className="text-sm font-bold border-b pb-2 mb-3 text-foreground">Lampiran Bukti Baru</h3>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openPrivateFile(privateAppealPath(selectedSanggah.id))
-                      }
-                      className="flex items-center gap-3 p-3 border rounded-xl bg-background w-fit hover:border-primary/50 cursor-pointer group transition-colors"
-                    >
-                      <div className="h-10 w-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold group-hover:text-primary transition-colors">Lihat Berkas Lampiran</p>
-                        <p className="text-[10px] text-muted-foreground">PDF / JPG Document</p>
-                      </div>
-                      <Download className="h-4 w-4 text-muted-foreground ml-4 group-hover:text-primary transition-colors" />
-                    </button>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedSanggah.bukti_files.map((file: any) => (
+                        <button
+                          key={file.index}
+                          type="button"
+                          onClick={() =>
+                            openPrivateFile(privateAppealPath(selectedSanggah.id, file.index))
+                          }
+                          className="flex items-center gap-3 p-3 border rounded-xl bg-background w-fit hover:border-primary/50 cursor-pointer group transition-colors"
+                        >
+                          <div className="h-9 w-9 bg-primary/10 text-primary rounded-lg flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="text-left">
+                            <p className="text-xs font-bold group-hover:text-primary transition-colors max-w-[180px] truncate">{file.name || `Bukti ${file.index + 1}`}</p>
+                            <p className="text-[10px] text-muted-foreground">{file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : "Dokumen bukti"}</p>
+                          </div>
+                          <Download className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

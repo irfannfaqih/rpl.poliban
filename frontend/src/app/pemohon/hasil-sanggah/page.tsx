@@ -28,7 +28,8 @@ export default function HasilSanggahPage() {
   const [showSanggahForm, setShowSanggahForm] = useState(false);
   const [selectedMkIds, setSelectedMkIds] = useState<string[]>([]);
   const [sanggahReasons, setSanggahReasons] = useState<Record<string, string>>({});
-  const [buktiFile, setBuktiFile] = useState<File | null>(null);
+  const [buktiFiles, setBuktiFiles] = useState<File[]>([]);
+  const buktiFile = buktiFiles[0] ?? null;
   const [submitting, setSubmitting] = useState(false);
   const [pahamProsedur, setPahamProsedur] = useState(false);
 
@@ -85,9 +86,7 @@ export default function HasilSanggahPage() {
         formData.append(`items[${index}][alasan]`, sanggahReasons[mkId]);
       });
       formData.append("paham_prosedur", "1"); // pemohon sudah centang checkbox persetujuan
-      if (buktiFile) {
-        formData.append("bukti_file", buktiFile);
-      }
+      buktiFiles.forEach((file) => formData.append("bukti_files[]", file));
 
       await api.post("/pemohon/sanggah", formData, {
         headers: {
@@ -99,7 +98,7 @@ export default function HasilSanggahPage() {
       setShowSanggahForm(false);
       setSelectedMkIds([]);
       setSanggahReasons({});
-      setBuktiFile(null);
+      setBuktiFiles([]);
       setBriefingAcknowledged(false);
       setPahamProsedur(false);
       queryClient.invalidateQueries({ queryKey: ["hasil-pemohon"] });
@@ -384,18 +383,20 @@ export default function HasilSanggahPage() {
                       </strong>
                       &quot;{s.alasan}&quot;
                     </div>
-                    {s.bukti_path && (
-                      <div className="text-xs pt-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openPrivateFile(privateAppealPath(s.id))
-                          }
-                          className="inline-flex items-center gap-1 text-emerald-600 hover:underline font-bold"
-                        >
-                          <FileText className="w-3.5 h-3.5" /> Lihat Lampiran
-                          Bukti Sanggah
-                        </button>
+                    {s.bukti_files?.length > 0 && (
+                      <div className="text-xs pt-1 flex flex-wrap gap-2">
+                        {s.bukti_files.map((file: any) => (
+                          <button
+                            key={file.index}
+                            type="button"
+                            onClick={() =>
+                              openPrivateFile(privateAppealPath(s.id, file.index))
+                            }
+                            className="inline-flex items-center gap-1 text-emerald-600 hover:underline font-bold"
+                          >
+                            <FileText className="w-3.5 h-3.5" /> {file.name || `Bukti ${file.index + 1}`}
+                          </button>
+                        ))}
                       </div>
                     )}
                     {s.respon_asesor && (
@@ -619,9 +620,7 @@ export default function HasilSanggahPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-xs font-bold text-foreground">
-                      {buktiFile
-                        ? buktiFile.name
-                        : "Unggah Lampiran Bukti Baru"}
+                      Unggah Lampiran Bukti Baru
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wide">
                       {buktiFile
@@ -631,14 +630,37 @@ export default function HasilSanggahPage() {
                   </div>
                   <Input
                     type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png"
                     className="absolute inset-0 opacity-0 cursor-pointer"
                     onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setBuktiFile(e.target.files[0]);
+                      if (e.target.files) {
+                        setBuktiFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
+                        e.target.value = "";
                       }
                     }}
                   />
                 </div>
+                {buktiFiles.length > 0 && (
+                  <div className="space-y-2">
+                    {buktiFiles.map((file, index) => (
+                      <div key={`${file.name}-${index}`} className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2 text-xs">
+                        <FileText className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-foreground truncate">{file.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-red-500 hover:underline font-bold"
+                          onClick={() => setBuktiFiles((prev) => prev.filter((_, i) => i !== index))}
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 mt-6">
@@ -647,7 +669,7 @@ export default function HasilSanggahPage() {
                   onClick={() => {
                     setShowSanggahForm(false);
                     setBriefingAcknowledged(false);
-                    setBuktiFile(null);
+                    setBuktiFiles([]);
                     setSelectedMkIds([]);
                     setSanggahReasons({});
                   }}

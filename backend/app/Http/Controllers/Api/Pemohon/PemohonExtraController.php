@@ -13,7 +13,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class PemohonExtraController extends Controller
 {
@@ -240,7 +242,9 @@ class PemohonExtraController extends Controller
                 ),
             ],
             'items.*.alasan' => 'required|string',
-            'bukti_file' => 'nullable|file|max:10240', // 10MB
+            'bukti_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB
+            'bukti_files' => 'nullable|array|max:5',
+            'bukti_files.*' => 'file|mimes:pdf,jpg,jpeg,png|max:10240',
             'paham_prosedur' => 'required|accepted', // Wajib menyetujui prosedur banding
         ] : [
             'pendaftaran_id' => 'required|exists:pendaftaran,id',
@@ -254,7 +258,9 @@ class PemohonExtraController extends Controller
                 ),
             ],
             'alasan' => 'required|string',
-            'bukti_file' => 'nullable|file|max:10240', // 10MB
+            'bukti_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB
+            'bukti_files' => 'nullable|array|max:5',
+            'bukti_files.*' => 'file|mimes:pdf,jpg,jpeg,png|max:10240',
             'paham_prosedur' => 'required|accepted', // Wajib menyetujui prosedur banding
         ]);
 
@@ -325,11 +331,31 @@ class PemohonExtraController extends Controller
         );
 
         $path = null;
+        $storedAppealFiles = [];
         try {
+            $uploadedFiles = collect($request->file('bukti_files', []));
             if ($request->hasFile('bukti_file')) {
-                $path = $this->privateStorage->store(
-                    $request->file('bukti_file'),
-                    "sanggah/{$validated['pendaftaran_id']}",
+                $uploadedFiles->push($request->file('bukti_file'));
+            }
+
+            foreach ($uploadedFiles as $file) {
+                $storedAppealFiles[] = [
+                    'path' => $this->privateStorage->store(
+                        $file,
+                        "sanggah/{$validated['pendaftaran_id']}",
+                    ),
+                    'name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                ];
+            }
+
+            if (count($storedAppealFiles) === 1) {
+                $path = $storedAppealFiles[0]['path'];
+            } elseif (count($storedAppealFiles) > 1) {
+                $path = "sanggah/{$validated['pendaftaran_id']}/manifest_".Str::uuid().'.manifest.json';
+                Storage::disk(PrivateDocumentStorage::DISK)->put(
+                    $path,
+                    json_encode(['files' => $storedAppealFiles], JSON_THROW_ON_ERROR),
                 );
             }
 
@@ -379,6 +405,9 @@ class PemohonExtraController extends Controller
             });
         } catch (\Throwable $e) {
             $this->privateStorage->delete($path);
+            foreach ($storedAppealFiles as $file) {
+                $this->privateStorage->delete($file['path'] ?? null);
+            }
             throw $e;
         }
 

@@ -25,5 +25,5 @@ export const privateDocumentPath = (id: number | string) =>
 export const privateArchivePath = (id: number | string) =>
   `/private-files/arsip/${id}`;
 
-export const privateAppealPath = (id: number | string) =>
-  `/private-files/sanggah/${id}`;
+export const privateAppealPath = (id: number | string, fileIndex?: number) =>
+  `/private-files/sanggah/${id}${fileIndex !== undefined ? `?file=${fileIndex}` : ""}`;

@@ -50,9 +50,12 @@ class PrivateFileController extends Controller
         };
         abort_unless($allowed, 403);
 
+        $file = $sanggah->buktiFileAt((int) $request->query('file', 0));
+        abort_unless($file, 404, 'File tidak ditemukan.');
+
         return $this->storage->response(
-            $sanggah->bukti_path,
-            'bukti_sanggah_'.basename($sanggah->bukti_path),
+            $file['path'],
+            'bukti_sanggah_'.$file['name'],
         );
     }
 }
