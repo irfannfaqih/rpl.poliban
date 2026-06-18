@@ -137,11 +137,20 @@ class PemohonExtraController extends Controller
             return response()->json(['data' => null]);
         }
 
-        $pendaftaran->load([
-            'plenoMk.mataKuliah:id,kode,nama,sks',
-            'skKeputusan',
-            'sanggah.mataKuliah:id,kode,nama',
-        ]);
+        $pendaftaran->load('skKeputusan');
+
+        $canShowFinalResult = $pendaftaran->status_alur === 'finished'
+            && in_array($pendaftaran->skKeputusan?->status, ['menunggu_sk', 'sk_terbit'], true);
+
+        if ($canShowFinalResult) {
+            $pendaftaran->load([
+                'plenoMk.mataKuliah:id,kode,nama,sks',
+                'sanggah.mataKuliah:id,kode,nama',
+            ]);
+        } else {
+            $pendaftaran->setRelation('plenoMk', collect());
+            $pendaftaran->setRelation('sanggah', collect());
+        }
 
         return response()->json(['data' => $pendaftaran]);
     }

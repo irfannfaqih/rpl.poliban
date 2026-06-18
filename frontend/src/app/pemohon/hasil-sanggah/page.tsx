@@ -40,9 +40,13 @@ export default function HasilSanggahPage() {
   });
 
   const statusAlur = pendaftaran?.status_alur || "pre_submit";
+  const skStatus = pendaftaran?.sk_keputusan?.status;
+  const canShowFinalResult =
+    statusAlur === "finished" &&
+    (skStatus === "menunggu_sk" || skStatus === "sk_terbit");
 
   const results = useMemo(() => {
-    if (!pendaftaran?.pleno_mk) return [];
+    if (!canShowFinalResult || !pendaftaran?.pleno_mk) return [];
     return pendaftaran.pleno_mk.map((pmk: any) => ({
       id: pmk.mata_kuliah?.kode,
       mk_id: pmk.mata_kuliah?.id,
@@ -58,7 +62,7 @@ export default function HasilSanggahPage() {
           ? pmk.mata_kuliah?.sks || 0
           : 0,
     }));
-  }, [pendaftaran]);
+  }, [canShowFinalResult, pendaftaran]);
 
   const handleSubmitSanggah = async () => {
     if (!sanggahData.mkId || !sanggahData.alasan) {
@@ -107,7 +111,7 @@ export default function HasilSanggahPage() {
   );
 
   // Deklarasikan hasResults DULU sebelum canSanggah menggunakannya
-  const hasResults = results.length > 0 && statusAlur !== "borang";
+  const hasResults = canShowFinalResult && results.length > 0;
 
   // Deadline sanggah dari gelombang
   const deadlineSanggah = pendaftaran?.gelombang?.tgl_sanggah
@@ -116,7 +120,7 @@ export default function HasilSanggahPage() {
   const isDeadlinePassed = deadlineSanggah
     ? new Date() > deadlineSanggah
     : false;
-  const canSanggah = hasResults && !isDeadlinePassed;
+  const canSanggah = hasResults && skStatus === "menunggu_sk" && !isDeadlinePassed;
 
   const sanggahStatusText = useMemo(() => {
     if (!pendaftaran?.sanggah || pendaftaran.sanggah.length === 0) {

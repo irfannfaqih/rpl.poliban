@@ -129,6 +129,17 @@ class UjiLanjutanController extends Controller
             ],
             "items.*.pertanyaan_instruksi"  => "required|string",
             "items.*.kunci_jawaban"        => "nullable|string",
+            "deleted_item_ids"              => "nullable|array",
+            "deleted_item_ids.*"            => [
+                "integer",
+                "distinct",
+                Rule::exists("uji_lanjutan_item", "id")->where(
+                    fn ($query) => $query->where(
+                        "uji_lanjutan_id",
+                        UjiLanjutan::where("pendaftaran_id", $id)->value("id"),
+                    ),
+                ),
+            ],
         ]);
 
         $ujiLanjutan = UjiLanjutan::where("pendaftaran_id", $id)->firstOrFail();
@@ -151,8 +162,6 @@ class UjiLanjutanController extends Controller
                 409,
                 'Instrumen tidak dapat diubah setelah diterbitkan.',
             );
-            $savedIds = [];
-
             foreach ($validated["items"] as $item) {
                 if (isset($item["id"])) {
                     $ujiItem = UjiLanjutanItem::where(
@@ -160,16 +169,17 @@ class UjiLanjutanController extends Controller
                         $locked->id,
                     )->where("id", $item["id"])->firstOrFail();
                     $ujiItem->update($item);
-                    $savedIds[] = $ujiItem->id;
                 } else {
                     $item["uji_lanjutan_id"] = $locked->id;
-                    $savedIds[] = UjiLanjutanItem::create($item)->id;
+                    UjiLanjutanItem::create($item);
                 }
             }
 
-            UjiLanjutanItem::where("uji_lanjutan_id", $locked->id)
-                ->whereNotIn("id", $savedIds)
-                ->delete();
+            if (! empty($validated["deleted_item_ids"])) {
+                UjiLanjutanItem::where("uji_lanjutan_id", $locked->id)
+                    ->whereIn("id", $validated["deleted_item_ids"])
+                    ->delete();
+            }
             $locked->update([
                 "updated_by" => $asesorId,
                 "instrumen_updated_at" => now(),

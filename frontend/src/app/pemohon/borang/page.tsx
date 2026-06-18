@@ -38,6 +38,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import api from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useQuery } from "@tanstack/react-query";
 
 /* ------------------------------------------------------------------ */
@@ -67,7 +68,12 @@ export default function BorangPage() {
     lastSaved: state.lastSaved,
   })));
 
+  const user = useAuthStore((state) => state.user);
   const prodiId = usePendaftaranStore((state) => state.prodiId);
+  const setBorangOwnerContext = useBorangStore((state) => state.setOwnerContext);
+  const setPendaftaranOwnerContext = usePendaftaranStore((state) => state.setOwnerContext);
+  const setPendaftaranId = usePendaftaranStore((state) => state.setPendaftaranId);
+  const setProfile = usePendaftaranStore((state) => state.setProfile);
 
   const { data: pendaftaran, isLoading, refetch } = useQuery({
     queryKey: ['pendaftaran', 'summary'],
@@ -93,6 +99,25 @@ export default function BorangPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    setPendaftaranOwnerContext(user.id);
+    if (pendaftaran?.id) {
+      setBorangOwnerContext(user.id, pendaftaran.id);
+      setPendaftaranId(pendaftaran.id);
+      setProfile(user.nama, user.email, pendaftaran.prodi_id ? String(pendaftaran.prodi_id) : null);
+    }
+  }, [
+    user,
+    pendaftaran?.id,
+    pendaftaran?.prodi_id,
+    setBorangOwnerContext,
+    setPendaftaranOwnerContext,
+    setPendaftaranId,
+    setProfile,
+  ]);
 
   useEffect(() => {
     // If user is not allowed on this page, redirect them to their proper path

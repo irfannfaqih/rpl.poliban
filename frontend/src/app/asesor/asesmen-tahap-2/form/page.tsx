@@ -170,6 +170,7 @@ function UjiLanjutanFormContent() {
   const queryClient = useQueryClient();
 
   const [mkGroups, setMkGroups] = useState<MkInstrumen[]>([]);
+  const [deletedItemIds, setDeletedItemIds] = useState<number[]>([]);
   const [catatan, setCatatan] = useState("");
   const [showAddMk, setShowAddMk] = useState(false);
   const [newMk, setNewMk] = useState({ mata_kuliah_id: "" as number | "", tipe: "c3", tipe_label: "" });
@@ -246,9 +247,13 @@ function UjiLanjutanFormContent() {
 
   // Mutations
   const saveItemsMutation = useMutation({
-    mutationFn: (p: { items: ReturnType<typeof groupsToItems> }) =>
+    mutationFn: (p: { items: ReturnType<typeof groupsToItems>; deleted_item_ids?: number[] }) =>
       api.post(`/asesor/uji-lanjutan/${pendaftaranId}/soal`, p),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["asesor", "at2-form"] }); toast.success("Instrumen berhasil disimpan"); },
+    onSuccess: () => {
+      setDeletedItemIds([]);
+      queryClient.invalidateQueries({ queryKey: ["asesor", "at2-form"] });
+      toast.success("Instrumen berhasil disimpan");
+    },
     onError: (e: any) => toast.error(e.response?.data?.message || "Gagal menyimpan instrumen"),
   });
 
@@ -305,8 +310,19 @@ function UjiLanjutanFormContent() {
     setShowAddMk(false);
   };
   const tambahSoal = (gi: number) => setMkGroups((p) => p.map((g, i) => i === gi ? { ...g, soal: [...g.soal, { pertanyaan_instruksi: "", kunci_jawaban: "" }] } : g));
-  const hapusSoal = (gi: number, si: number) => setMkGroups((p) => p.map((g, i) => i === gi ? { ...g, soal: g.soal.filter((_, j) => j !== si) } : g).filter((g) => g.soal.length > 0));
-  const hapusMk = (gi: number) => setMkGroups((p) => p.filter((_, i) => i !== gi));
+  const markDeletedItems = (ids: Array<number | undefined>) => {
+    const validIds = ids.filter((id): id is number => typeof id === "number");
+    if (validIds.length === 0) return;
+    setDeletedItemIds((prev) => Array.from(new Set([...prev, ...validIds])));
+  };
+  const hapusSoal = (gi: number, si: number) => {
+    markDeletedItems([mkGroups[gi]?.soal[si]?.id]);
+    setMkGroups((p) => p.map((g, i) => i === gi ? { ...g, soal: g.soal.filter((_, j) => j !== si) } : g).filter((g) => g.soal.length > 0));
+  };
+  const hapusMk = (gi: number) => {
+    markDeletedItems(mkGroups[gi]?.soal.map((s) => s.id) || []);
+    setMkGroups((p) => p.filter((_, i) => i !== gi));
+  };
   const updateSoal = (gi: number, si: number, f: keyof Soal, v: string) => setMkGroups((p) => p.map((g, i) => i === gi ? { ...g, soal: g.soal.map((s, j) => j === si ? { ...s, [f]: v } : s) } : g));
   const setSkor = (gi: number, si: number, n: number) => setMkGroups((p) => p.map((g, i) => i === gi ? { ...g, soal: g.soal.map((s, j) => j === si ? { ...s, skor_saya: n } : s) } : g));
 
@@ -334,7 +350,7 @@ function UjiLanjutanFormContent() {
               </div>
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setShowPublishConfirm(false)} disabled={publishMutation.isPending}>Batal</Button>
-                <Button onClick={() => saveItemsMutation.mutateAsync({ items: groupsToItems(mkGroups) }).then(() => publishMutation.mutate())}
+                <Button onClick={() => saveItemsMutation.mutateAsync({ items: groupsToItems(mkGroups), deleted_item_ids: deletedItemIds }).then(() => publishMutation.mutate())}
                   disabled={publishMutation.isPending || saveItemsMutation.isPending}
                   className="gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-primary dark:text-primary-foreground">
                   {(publishMutation.isPending || saveItemsMutation.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -989,7 +1005,7 @@ function UjiLanjutanFormContent() {
                       <div className="flex justify-end pt-2">
                         <Button
                           className="gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-primary dark:text-primary-foreground"
-                          onClick={() => saveItemsMutation.mutate({ items: groupsToItems(mkGroups) }, {
+                          onClick={() => saveItemsMutation.mutate({ items: groupsToItems(mkGroups), deleted_item_ids: deletedItemIds }, {
                             onSuccess: () => { setShowEditInstrumen(false); }
                           })}
                           disabled={saveItemsMutation.isPending}

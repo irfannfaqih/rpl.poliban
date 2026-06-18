@@ -40,10 +40,13 @@ interface BorangData {
 }
 
 interface BorangState {
+  ownerUserId: number | null;
+  ownerPendaftaranId: number | null;
   data: BorangData;
   activeSection: string;
   lastSaved: Date | null;
   touchedSections: string[];
+  setOwnerContext: (userId: number | null, pendaftaranId: number | null) => void;
   updateSection: (section: keyof BorangData, values: BorangData[keyof BorangData]) => void;
   setActiveSection: (section: string) => void;
   setSectionTouched: (section: string) => void;
@@ -100,10 +103,31 @@ const initialBorangData: BorangData = {
 export const useBorangStore = create<BorangState>()(
   persist(
     (set, get) => ({
+      ownerUserId: null,
+      ownerPendaftaranId: null,
       data: initialBorangData,
       activeSection: 'sectionA',
       lastSaved: null,
       touchedSections: ['sectionA'],
+
+      setOwnerContext: (userId, pendaftaranId) => {
+        const state = get();
+        if (
+          state.ownerUserId === userId &&
+          state.ownerPendaftaranId === pendaftaranId
+        ) {
+          return;
+        }
+
+        set({
+          ownerUserId: userId,
+          ownerPendaftaranId: pendaftaranId,
+          data: initialBorangData,
+          activeSection: 'sectionA',
+          lastSaved: null,
+          touchedSections: ['sectionA'],
+        });
+      },
 
       updateSection: (section, values) =>
         set((state) => ({

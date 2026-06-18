@@ -47,6 +47,21 @@ const ROLE_DASHBOARD_MAP: Record<string, string> = {
   super_admin: "/super-admin/gelombang",
 };
 
+export const clearWorkflowStorage = () => {
+  if (typeof window === "undefined") return;
+
+  const keys = [
+    "pendaftaran-storage",
+    "borang-storage",
+    "asesor-storage",
+  ];
+
+  keys.forEach((key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
+};
+
 export const getRoleDashboard = (user: User | null): string => {
   if (!user) return "/auth/login";
   if (user.role === "pemohon" && user.status_alur) {
@@ -71,9 +86,7 @@ export const useAuthStore = create<AuthState>()(
           const { token, user } = data;
 
           // Clear previous user's persisted stores
-          localStorage.removeItem("pendaftaran-storage");
-          localStorage.removeItem("borang-storage");
-          localStorage.removeItem("asesor-storage");
+          clearWorkflowStorage();
 
           // Store token separately for API interceptor
           localStorage.setItem("auth_token", token);
@@ -97,9 +110,7 @@ export const useAuthStore = create<AuthState>()(
           // Ignore error, clear auth anyway
         }
         localStorage.removeItem("auth_token");
-        localStorage.removeItem("pendaftaran-storage");
-        localStorage.removeItem("borang-storage");
-        localStorage.removeItem("asesor-storage");
+        clearWorkflowStorage();
         set({ user: null, token: null, isAuthenticated: false });
       },
 
@@ -120,9 +131,7 @@ export const useAuthStore = create<AuthState>()(
 
       clearAuth: () => {
         localStorage.removeItem("auth_token");
-        localStorage.removeItem("pendaftaran-storage");
-        localStorage.removeItem("borang-storage");
-        localStorage.removeItem("asesor-storage");
+        clearWorkflowStorage();
         set({ user: null, token: null, isAuthenticated: false });
       },
       clearImpersonate: () => {

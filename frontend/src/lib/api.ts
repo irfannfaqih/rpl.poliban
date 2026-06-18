@@ -33,6 +33,12 @@ api.interceptors.response.use(
         if (!window.location.pathname.startsWith("/auth/")) {
           localStorage.removeItem("auth_token");
           localStorage.removeItem("auth-storage");
+          ["pendaftaran-storage", "borang-storage", "asesor-storage"].forEach(
+            (key) => {
+              localStorage.removeItem(key);
+              sessionStorage.removeItem(key);
+            },
+          );
           window.location.href = "/auth/login?session_expired=1";
         }
       }
