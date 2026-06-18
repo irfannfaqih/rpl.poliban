@@ -33,6 +33,7 @@ interface PelatihanItem {
 export default function SectionB() {
   const data = useBorangStore((s) => s.data.sectionB);
   const updateSection = useBorangStore((s) => s.updateSection);
+  const currentYear = new Date().getFullYear();
 
   const items: PendidikanItem[] = (data.items || []) as any[];
 
@@ -94,6 +95,35 @@ export default function SectionB() {
     updateSection("sectionB", { ...data, pelatihan: newVal });
   };
 
+  const validateEducationItem = (item: PendidikanItem) => {
+    const tahunMasuk = Number(item.tahunMasuk);
+    const tahunLulus = Number(item.tahunLulus);
+    const ipk = Number(item.ipk);
+    const errors: Partial<Record<keyof PendidikanItem, string>> = {};
+
+    if (!item.tahunMasuk?.trim()) {
+      errors.tahunMasuk = "Tahun masuk wajib diisi.";
+    } else if (!Number.isInteger(tahunMasuk) || tahunMasuk < 1900 || tahunMasuk > currentYear) {
+      errors.tahunMasuk = `Tahun masuk harus antara 1900 dan ${currentYear}.`;
+    }
+
+    if (!item.tahunLulus?.trim()) {
+      errors.tahunLulus = "Tahun lulus wajib diisi.";
+    } else if (!Number.isInteger(tahunLulus) || tahunLulus < 1900 || tahunLulus > currentYear) {
+      errors.tahunLulus = `Tahun lulus harus antara 1900 dan ${currentYear}.`;
+    } else if (item.tahunMasuk && item.tahunLulus && tahunLulus < tahunMasuk) {
+      errors.tahunLulus = "Tahun lulus harus sama dengan atau setelah tahun masuk.";
+    }
+
+    if (!item.ipk?.trim()) {
+      errors.ipk = "IPK akhir wajib diisi.";
+    } else if (!Number.isFinite(ipk) || ipk < 0 || ipk > 4) {
+      errors.ipk = "IPK akhir harus berada pada rentang 0 sampai 4.";
+    }
+
+    return errors;
+  };
+
   return (
     <div className="space-y-10">
       <div>
@@ -110,7 +140,9 @@ export default function SectionB() {
         </div>
 
         <div className="space-y-6">
-          {items.map((item, i) => (
+          {items.map((item, i) => {
+            const itemErrors = validateEducationItem(item);
+            return (
             <div
               key={i}
               className="rounded-2xl border border-border bg-card p-6"
@@ -178,8 +210,12 @@ export default function SectionB() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       updateItem(i, "tahunMasuk", e.target.value.replace(/\D/g, ""))
                     }
-                    className="h-11 font-mono rounded-xl text-left"
+                    aria-invalid={!!itemErrors.tahunMasuk}
+                    className={`h-11 font-mono rounded-xl text-left ${itemErrors.tahunMasuk ? "border-destructive focus-visible:ring-destructive/20" : ""}`}
                   />
+                  {itemErrors.tahunMasuk && (
+                    <p className="text-xs text-destructive">{itemErrors.tahunMasuk}</p>
+                  )}
                 </div>
                 <div className="md:col-span-4 space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase">Tahun Lulus <span className="text-destructive">*</span></Label>
@@ -190,24 +226,37 @@ export default function SectionB() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       updateItem(i, "tahunLulus", e.target.value.replace(/\D/g, ""))
                     }
-                    className="h-11 font-mono rounded-xl text-left"
+                    aria-invalid={!!itemErrors.tahunLulus}
+                    className={`h-11 font-mono rounded-xl text-left ${itemErrors.tahunLulus ? "border-destructive focus-visible:ring-destructive/20" : ""}`}
                   />
+                  {itemErrors.tahunLulus && (
+                    <p className="text-xs text-destructive">{itemErrors.tahunLulus}</p>
+                  )}
                 </div>
                 <div className="md:col-span-4 space-y-2">
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase">IPK Akhir</Label>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase">IPK Akhir <span className="text-destructive">*</span></Label>
                   <Input
+                    type="number"
+                    min={0}
+                    max={4}
+                    step={0.01}
                     placeholder="Contoh: 3.50"
                     value={item.ipk || ""}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       updateItem(i, "ipk", e.target.value)
                     }
-                    className="h-11 font-mono rounded-xl text-left"
+                    aria-invalid={!!itemErrors.ipk}
+                    className={`h-11 font-mono rounded-xl text-left ${itemErrors.ipk ? "border-destructive focus-visible:ring-destructive/20" : ""}`}
                   />
+                  {itemErrors.ipk && (
+                    <p className="text-xs text-destructive">{itemErrors.ipk}</p>
+                  )}
                 </div>
               </div>
 
             </div>
-          ))}
+            );
+          })}
 
           {items.length === 0 && (
             <div className="text-center py-10 px-4 border border-dashed border-border rounded-xl bg-background">

@@ -231,9 +231,9 @@ export default function BorangPage() {
             jenjang: i.jenjang,
             institusi: i.institusi,
             program_studi: i.jurusan || i.program_studi || null,
-            tahun_masuk: parseInt(i.tahunMasuk) || new Date().getFullYear(),
-            tahun_lulus: parseInt(i.tahunLulus) || new Date().getFullYear(),
-            ipk: i.ipk ? parseFloat(i.ipk) : null,
+            tahun_masuk: Number(i.tahunMasuk),
+            tahun_lulus: Number(i.tahunLulus),
+            ipk: Number(i.ipk),
           }))
         });
       }

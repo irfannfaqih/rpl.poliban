@@ -32,6 +32,15 @@ const defaultPenilaian = (): PenilaianItem => ({
   nilai: "", catatan: "", valid: null, autentik: null, terkini: null, cukup: null,
 });
 
+const isVatcComplete = (item: PenilaianItem) =>
+  item.valid !== null &&
+  item.autentik !== null &&
+  item.terkini !== null &&
+  item.cukup !== null;
+
+const isCpmkComplete = (item: PenilaianItem) =>
+  item.nilai !== "" && isVatcComplete(item);
+
 export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegisterSave, onPreview }: { tugas: any; onLocalChange?: (count: number) => void; onRegisterSave?: (fn: () => Promise<void>) => void; onPreview?: (url: string, name: string) => void }) {
   const queryClient = useQueryClient();
   const isReadOnly = tugas?.status === 'submit_final';
@@ -59,7 +68,7 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
 
   // Laporan jumlah terisi ke parent (real-time)
   useEffect(() => {
-    const count = Object.values(penilaian).filter((p) => p.nilai !== "").length;
+    const count = Object.values(penilaian).filter(isCpmkComplete).length;
     onLocalChange?.(count);
   }, [penilaian, onLocalChange]);
 
@@ -114,7 +123,7 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
 
   // Hitung jumlah CPMK yang sudah dinilai
   const totalCpmkCount = mataKuliahList.reduce((acc: number, mk: any) => acc + (mk.cpmk?.length || 0), 0);
-  const assessedCpmkCount = Object.values(penilaian).filter((p) => p.nilai !== "").length;
+  const assessedCpmkCount = Object.values(penilaian).filter(isCpmkComplete).length;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -201,6 +210,7 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
                 {mk.cpmk && mk.cpmk.length > 0 ? (
                   mk.cpmk.map((cpmk: any) => {
                     const val = getItem(cpmk.id);
+                    const vatcIncomplete = val.nilai !== "" && !isVatcComplete(val);
                     // Cari evaluasi mandiri pemohon untuk CPMK ini
                     const selfEval = tugas?.pendaftaran?.evaluasi_diri?.find((ed: any) => ed.cpmk_id === cpmk.id);
                     const selfProfisiensi = selfEval ? selfEval.profisiensi : null;
@@ -352,7 +362,7 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
                             {/* VATC - evaluasi kualitas bukti dokumen pemohon */}
                             <div className="space-y-1 shrink-0">
                               <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                Evaluasi Bukti (VATC)
+                                Evaluasi Bukti (VATC) <span className="text-destructive">*</span>
                               </span>
                               <div className="flex gap-1.5">
                                 {VATC_ITEMS.map((v) => {
@@ -392,6 +402,11 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
                                   );
                                 })}
                               </div>
+                              {vatcIncomplete && (
+                                <p className="max-w-xs text-[10px] font-medium text-destructive">
+                                  Lengkapi Valid, Autentik, Terkini, dan Cukup sebelum submit final.
+                                </p>
+                              )}
                             </div>
                           </div>
 

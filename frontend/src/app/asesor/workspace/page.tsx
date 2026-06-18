@@ -122,7 +122,13 @@ function AsesorWorkspaceContent() {
   const totalCpmk = mkPolibanCpmkList.reduce((acc: number, mk: any) => acc + (mk.cpmk?.length || 0), 0);
 
   // Gunakan local state (real-time) jika tersedia, fallback ke data server
-  const dinilaiCpmk = localCpmkCount ?? (task?.penilaian_cpmk || []).filter((p: any) => p.nilai).length;
+  const dinilaiCpmk = localCpmkCount ?? (task?.penilaian_cpmk || []).filter((p: any) =>
+    p.nilai &&
+    p.valid !== null &&
+    p.autentik !== null &&
+    p.terkini !== null &&
+    p.cukup !== null
+  ).length;
   const pemetaanSelesai = localPemetaanCount ?? mkAsalList.filter((mk: any) => {
     const mapped = (task?.pemetaan_mk || []).find((m: any) =>
       m.mk_asal_kode === mk.kode_mk || m.mk_asal_kode === mk.id?.toString()
@@ -159,6 +165,7 @@ function AsesorWorkspaceContent() {
     },
   ];
   const semuaLengkap = validasiKelengkapan.every((v) => v.ok);
+  const cpmkLengkap = validasiKelengkapan.find((v) => v.key === "cpmk")?.ok ?? false;
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -237,14 +244,20 @@ function AsesorWorkspaceContent() {
               </Button>
               <Button
                 onClick={() => submitFinalMutation.mutate()}
-                disabled={submitFinalMutation.isPending}
+                disabled={submitFinalMutation.isPending || !cpmkLengkap}
                 className={`flex-1 h-10 gap-2 ${semuaLengkap
                   ? "bg-slate-900 hover:bg-slate-800 text-white dark:bg-primary dark:text-primary-foreground"
                   : "bg-amber-600 hover:bg-amber-700 text-white"
                   }`}
               >
                 <CheckCircle2 className="h-4 w-4" />
-                {submitFinalMutation.isPending ? "Memproses..." : semuaLengkap ? "Ya, Submit Final" : "Submit Meski Belum Lengkap"}
+                {submitFinalMutation.isPending
+                  ? "Memproses..."
+                  : !cpmkLengkap
+                    ? "Lengkapi VATC CPMK"
+                    : semuaLengkap
+                      ? "Ya, Submit Final"
+                      : "Submit Meski Belum Lengkap"}
               </Button>
             </div>
           </div>

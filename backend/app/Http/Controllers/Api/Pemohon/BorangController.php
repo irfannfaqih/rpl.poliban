@@ -18,6 +18,7 @@ use App\Services\RegistrationEligibilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class BorangController extends Controller
 {
@@ -245,15 +246,39 @@ class BorangController extends Controller
     ): JsonResponse {
         $this->authorize('update', $pendaftaran);
 
+        $currentYear = now()->year;
+
         $validated = $request->validate([
             "items" => "required|array",
             "items.*.jenjang" => "required|string|max:50",
             "items.*.institusi" => "required|string|max:255",
             "items.*.program_studi" => "nullable|string|max:255",
-            "items.*.tahun_masuk" => "required|integer",
-            "items.*.tahun_lulus" => "required|integer",
-            "items.*.ipk" => "nullable|numeric|min:0|max:4",
+            "items.*.tahun_masuk" => "required|integer|min:1900|max:{$currentYear}",
+            "items.*.tahun_lulus" => "required|integer|min:1900|max:{$currentYear}",
+            "items.*.ipk" => "required|numeric|min:0|max:4",
+        ], [
+            "items.*.tahun_masuk.min" => "Tahun masuk harus berada dalam rentang tahun yang rasional.",
+            "items.*.tahun_masuk.max" => "Tahun masuk tidak boleh melebihi tahun berjalan.",
+            "items.*.tahun_lulus.min" => "Tahun lulus harus berada dalam rentang tahun yang rasional.",
+            "items.*.tahun_lulus.max" => "Tahun lulus tidak boleh melebihi tahun berjalan.",
+            "items.*.ipk.required" => "IPK akhir wajib diisi.",
+            "items.*.ipk.numeric" => "IPK akhir harus berupa angka.",
+            "items.*.ipk.min" => "IPK akhir minimal 0.",
+            "items.*.ipk.max" => "IPK akhir maksimal 4.",
         ]);
+
+        $dateErrors = [];
+        foreach ($validated["items"] as $index => $item) {
+            if ((int) $item["tahun_lulus"] < (int) $item["tahun_masuk"]) {
+                $dateErrors["items.{$index}.tahun_lulus"] = [
+                    "Tahun lulus harus sama dengan atau setelah tahun masuk.",
+                ];
+            }
+        }
+
+        if (! empty($dateErrors)) {
+            throw ValidationException::withMessages($dateErrors);
+        }
 
         DB::transaction(function () use ($pendaftaran, $validated) {
             RiwayatPendidikan::where(

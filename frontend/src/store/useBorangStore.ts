@@ -189,12 +189,32 @@ export const useBorangStore = create<BorangState>()(
           case 'sectionB': {
             const items = (data.sectionB.items || []) as Record<string, string>[];
             const transkrip = (data.sectionB.transkrip || []) as Record<string, string>[];
+            const currentYear = new Date().getFullYear();
+            const isValidYear = (value: string) => {
+              const year = Number(value);
+              return Number.isInteger(year) && year >= 1900 && year <= currentYear;
+            };
+            const isValidIpk = (value: string) => {
+              if (value === undefined || value === null || value.toString().trim() === "") return false;
+              const ipk = Number(value);
+              return Number.isFinite(ipk) && ipk >= 0 && ipk <= 4;
+            };
 
             if (items.length === 0) return false;
-            const itemsValid = items.every((it) =>
-              it.jenjang && it.institusi && it.tahunMasuk && it.tahunLulus &&
-              it.jenjang.trim() !== "" && it.institusi.trim() !== ""
-            );
+            const itemsValid = items.every((it) => {
+              const tahunMasuk = Number(it.tahunMasuk);
+              const tahunLulus = Number(it.tahunLulus);
+              return !!(
+                it.jenjang &&
+                it.institusi &&
+                it.jenjang.trim() !== "" &&
+                it.institusi.trim() !== "" &&
+                isValidYear(it.tahunMasuk) &&
+                isValidYear(it.tahunLulus) &&
+                tahunLulus >= tahunMasuk &&
+                isValidIpk(it.ipk)
+              );
+            });
             if (!itemsValid) return false;
 
             if (transkrip.length === 0) return false;

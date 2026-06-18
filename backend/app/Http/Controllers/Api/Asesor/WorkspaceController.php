@@ -457,6 +457,32 @@ class WorkspaceController extends Controller
                     "Penilaian sudah pernah disubmit final.",
                 );
 
+                $totalCpmk = \App\Models\Cpmk::whereHas(
+                    'mataKuliah',
+                    fn ($query) => $query->where('prodi_id', $pendaftaran->prodi_id),
+                )->count();
+                $completeCpmk = PenilaianCpmk::where(
+                    'penugasan_asesor_id',
+                    $lockedTask->id,
+                )
+                    ->whereHas(
+                        'cpmk.mataKuliah',
+                        fn ($query) => $query->where('prodi_id', $pendaftaran->prodi_id),
+                    )
+                    ->whereNotNull('nilai')
+                    ->whereNotNull('valid')
+                    ->whereNotNull('autentik')
+                    ->whereNotNull('terkini')
+                    ->whereNotNull('cukup')
+                    ->distinct('cpmk_id')
+                    ->count('cpmk_id');
+
+                abort_if(
+                    $totalCpmk > 0 && $completeCpmk < $totalCpmk,
+                    422,
+                    'Penilaian CPMK belum lengkap. Setiap CPMK wajib memiliki nilai dan seluruh indikator VATC: Valid, Autentik, Terkini, dan Cukup.',
+                );
+
                 $lockedTask->update([
                     "status" => "submit_final",
                     "butuh_at2" => $validated["butuh_at2"] ?? false,
