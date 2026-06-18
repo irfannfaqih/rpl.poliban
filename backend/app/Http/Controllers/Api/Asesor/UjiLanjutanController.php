@@ -157,10 +157,9 @@ class UjiLanjutanController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
             abort_unless(
-                $locked->fase_tulis === 'buat_soal' &&
                 ! $locked->ujian_dimulai_at,
                 409,
-                'Instrumen tidak dapat diubah setelah diterbitkan.',
+                'Instrumen tidak dapat diubah setelah ujian dimulai.',
             );
             foreach ($validated["items"] as $item) {
                 if (isset($item["id"])) {

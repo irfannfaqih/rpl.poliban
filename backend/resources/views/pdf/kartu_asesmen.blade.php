@@ -98,12 +98,12 @@
     <tbody>
         <tr>
             <td>
-                {{ $jadwal?->tanggal
-                    ? \Carbon\Carbon::parse($jadwal->tanggal)->translatedFormat('l, d F Y')
+                {{ $jadwal?->tanggal_ujian
+                    ? \Carbon\Carbon::parse($jadwal->tanggal_ujian)->translatedFormat('l, d F Y')
                     : 'Belum ditetapkan' }}
             </td>
             <td style="text-align:center;">
-                {{ $jadwal?->waktu ? $jadwal->waktu . ' WITA' : '-' }}
+                {{ $jadwal?->waktu_ujian ? $jadwal->waktu_ujian . ' WITA' : '-' }}
             </td>
             <td>{{ $jadwal?->tempat ?? 'Belum ditetapkan' }}</td>
             <td>
