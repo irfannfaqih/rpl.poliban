@@ -294,38 +294,53 @@ class PlenoController extends Controller
                 ->keyBy("mk_poliban_id")
             : collect();
 
-        // Gabungkan semua MK yang perlu di-compile
+        // PRE-LOAD: seluruh transkrip pendaftaran ini (bukan query per-MK di dalam loop)
+        $semuaTranskrip = TranskripAsal::where(
+            "pendaftaran_id",
+            $pendaftaran->id,
+        )->get();
+        $transkripMkIds = $semuaTranskrip
+            ->pluck("mk_poliban_id")
+            ->filter()
+            ->unique();
+
+        // Nilai AT2 harus dihitung per mata kuliah. nilai_at2_final pada
+        // uji_lanjutan tetap boleh dipakai sebagai ringkasan, tetapi tidak
+        // boleh menjadi sumber nilai pleno untuk seluruh MK.
+        $at2Scores = $this->at2ScoresByAsesorAndMk($pendaftaran, collect([
+            $tugasA1?->asesor_id,
+            $tugasA2?->asesor_id,
+        ])->filter()->values());
+        $at2MkIds = $at2Scores
+            ->flatMap(fn ($scoresByMk) => $scoresByMk->keys())
+            ->unique();
+
+        // Gabungkan semua MK yang punya basis data valid.
         $mkIds = collect()
             ->merge($pemetaanA1->keys())
             ->merge($pemetaanA2->keys())
             ->merge($claimedMkIds)
+            ->merge($transkripMkIds)
+            ->merge($at2MkIds)
+            ->filter()
             ->unique();
 
         if ($mkIds->isEmpty()) {
             return;
         }
 
-        // PRE-LOAD: seluruh transkrip pendaftaran ini (bukan query per-MK di dalam loop)
-        $semuaTranskrip = TranskripAsal::where(
-            "pendaftaran_id",
-            $pendaftaran->id,
-        )->get();
-
-        // Ambil nilai AT2 final jika pendaftaran pernah melewati fase AT2
-        $nilaiAt2 = \App\Models\UjiLanjutan::where("pendaftaran_id", $pendaftaran->id)
-            ->whereNotNull("nilai_at2_final")
-            ->value("nilai_at2_final");
-
         foreach ($mkIds as $mkId) {
             [$keputusanA1, $nilaiA1, $bobotA1] = $this->resolveNilai(
                 $pemetaanA1->get($mkId),
                 $semuaTranskrip,
-                $nilaiAt2 ? (float) $nilaiAt2 : null,
+                $this->at2ScoreFor($at2Scores, $tugasA1?->asesor_id, (int) $mkId),
+                (int) $mkId,
             );
             [$keputusanA2, $nilaiA2, $bobotA2] = $this->resolveNilai(
                 $pemetaanA2->get($mkId),
                 $semuaTranskrip,
-                $nilaiAt2 ? (float) $nilaiAt2 : null,
+                $this->at2ScoreFor($at2Scores, $tugasA2?->asesor_id, (int) $mkId),
+                (int) $mkId,
             );
 
             [$status, $keputusanFinal] = $this->resolveStatus(
@@ -374,6 +389,61 @@ class PlenoController extends Controller
     }
 
     /**
+     * Ambil nilai AT2 per asesor per mata kuliah.
+     *
+     * Item AT2 tanpa mata_kuliah_id sengaja diabaikan agar nilainya tidak
+     * menyebar ke semua MK pada pleno.
+     *
+     * @return \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, float>>
+     */
+    private function at2ScoresByAsesorAndMk(Pendaftaran $pendaftaran, $asesorIds)
+    {
+        if ($asesorIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('uji_lanjutan_penilaian')
+            ->join(
+                'uji_lanjutan_item',
+                'uji_lanjutan_penilaian.uji_lanjutan_item_id',
+                '=',
+                'uji_lanjutan_item.id',
+            )
+            ->join(
+                'uji_lanjutan',
+                'uji_lanjutan_item.uji_lanjutan_id',
+                '=',
+                'uji_lanjutan.id',
+            )
+            ->where('uji_lanjutan.pendaftaran_id', $pendaftaran->id)
+            ->whereNotNull('uji_lanjutan_item.mata_kuliah_id')
+            ->whereIn('uji_lanjutan_penilaian.asesor_id', $asesorIds)
+            ->groupBy(
+                'uji_lanjutan_penilaian.asesor_id',
+                'uji_lanjutan_item.mata_kuliah_id',
+            )
+            ->selectRaw(
+                'uji_lanjutan_penilaian.asesor_id, uji_lanjutan_item.mata_kuliah_id, AVG(uji_lanjutan_penilaian.skor) * 20 as nilai_at2',
+            )
+            ->get()
+            ->groupBy('asesor_id')
+            ->map(fn ($rows) => $rows->mapWithKeys(fn ($row) => [
+                (int) $row->mata_kuliah_id => round((float) $row->nilai_at2, 2),
+            ]));
+    }
+
+    private function at2ScoreFor($at2Scores, ?int $asesorId, int $mkId): ?float
+    {
+        if (! $asesorId) {
+            return null;
+        }
+
+        $score = $at2Scores->get($asesorId)?->get($mkId);
+
+        return $score === null ? null : (float) $score;
+    }
+
+    /**
      * Konversi bobot rata-rata (0–4) ke nilai huruf Poliban terdekat.
      * Digunakan untuk menentukan keputusan final pleno dari rata-rata bobot dua asesor.
      * CD/D/E (< 1.75) dilebur menjadi T karena RPL tidak mengakui MK di bawah C.
@@ -396,10 +466,35 @@ class PlenoController extends Controller
      *
      * @return array{string, string, float}  [keputusan, nilai_huruf, bobot]
      */
-    private function resolveNilai(?PemetaanMk $pemetaan, $semuaTranskrip, ?float $nilaiAt2 = null): array
+    private function resolveNilai(
+        ?PemetaanMk $pemetaan,
+        $semuaTranskrip,
+        ?float $nilaiAt2 = null,
+        ?int $mkId = null,
+    ): array
     {
+        $targetMkId = $pemetaan?->mk_poliban_id ?? $mkId;
+        $transkrip = $targetMkId
+            ? $semuaTranskrip->firstWhere('mk_poliban_id', $targetMkId)
+            : null;
+
         if (!$pemetaan) {
-            // Tidak ada pemetaan: gunakan AT2 jika ada, atau tidak diakui
+            if ($transkrip) {
+                $bobot = floatval($transkrip->nilai_angka);
+                $huruf = $transkrip->nilai_huruf;
+
+                if ($nilaiAt2 !== null) {
+                    [$kepAt2, $hurufAt2, $bobotAt2] = $this->skorKeNilaiPoliban($nilaiAt2);
+                    if ($bobotAt2 > $bobot) {
+                        return [$kepAt2, $hurufAt2, $bobotAt2];
+                    }
+                }
+
+                return ['diakui', $huruf, $bobot];
+            }
+
+            // Tidak ada pemetaan/transkrip: gunakan AT2 per-MK jika ada,
+            // atau tidak diakui. Tidak pernah memakai nilai AT2 global.
             if ($nilaiAt2 !== null) {
                 return $this->skorKeNilaiPoliban($nilaiAt2);
             }
@@ -409,8 +504,6 @@ class PlenoController extends Controller
         $keputusan = in_array($pemetaan->keputusan, ['diakui_penuh', 'diakui_sebagian'])
             ? 'diakui'
             : 'tidak_diakui';
-
-        $transkrip = $semuaTranskrip->firstWhere('mk_poliban_id', $pemetaan->mk_poliban_id);
 
         if ($transkrip) {
             $bobot = floatval($transkrip->nilai_angka);
