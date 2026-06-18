@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import api from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -333,14 +333,8 @@ export default function KurikulumPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-1 max-w-[220px]">
-          <TabsTrigger value="kurikulum" className="text-sm font-medium">
-            Daftar Kurikulum
-          </TabsTrigger>
-        </TabsList>
-
         {/* TAB 1: Daftar Kurikulum */}
-        <TabsContent value="kurikulum" className="mt-6 space-y-6">
+        <TabsContent value="kurikulum" className="space-y-6">
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="relative w-full sm:w-96">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
