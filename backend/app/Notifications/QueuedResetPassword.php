@@ -17,8 +17,10 @@ class QueuedResetPassword extends ResetPassword implements ShouldQueue
 
     public function toMail($notifiable): ResetPasswordMail
     {
+        // Use $notifiable->email (property) instead of getEmailForPasswordReset() (method)
+        // Property access works on serialized stdClass, method calls don't
         return (new ResetPasswordMail($this->resetUrl($notifiable), $notifiable))
-            ->to($notifiable->getEmailForPasswordReset());
+            ->to($notifiable->email);
     }
 
     /**

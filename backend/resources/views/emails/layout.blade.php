@@ -14,11 +14,8 @@
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width: 100%; max-width: 640px; margin: 0 auto; padding: 24px 16px; background-color: #ffffff;">
         <tr>
             <td align="center" style="padding-top: 24px; padding-bottom: 16px;">
-                <!-- Logo Header: public HTTPS Poliban logo -->
-                <img alt="Logo Politeknik Negeri Banjarmasin" src="https://rplpoliban.my.id/storage/poliban-email.jpg?v=20f" style="height: 72px; width: 72px; object-fit: contain; display: block;">
-                <div style="margin-top: 8px; font-size: 13px; color: #004ac6; font-weight: 700; letter-spacing: 0.05em;">
-                    POLITEKNIK NEGERI BANJARMASIN
-                </div>
+                <!-- Logo Header: PNG logo Poliban with gold border -->
+                <img alt="Logo Politeknik Negeri Banjarmasin" src="https://rplpoliban.my.id/storage/poliban-email.png" style="height: 72px; width: 72px; object-fit: contain; display: block;">
             </td>
         </tr>
         <tr>
