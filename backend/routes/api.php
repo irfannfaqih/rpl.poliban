@@ -245,6 +245,8 @@ Route::middleware('auth:sanctum')->group(function () {
             // Uji Lanjutan / AT2 (Asesmen Tahap 2)
             Route::get('uji-lanjutan', [AsesorUjiLanjutanController::class, 'index']);
             Route::get('uji-lanjutan/{pendaftaran_id}', [AsesorUjiLanjutanController::class, 'show']);
+            Route::get('uji-lanjutan/{pendaftaran_id}/copy-sources', [AsesorUjiLanjutanController::class, 'copySources']);
+            Route::post('uji-lanjutan/{pendaftaran_id}/copy', [AsesorUjiLanjutanController::class, 'copyItems']);
             Route::post('uji-lanjutan/{pendaftaran_id}/soal', [AsesorUjiLanjutanController::class, 'saveItems']);
             Route::post('uji-lanjutan/{pendaftaran_id}/publish', [AsesorUjiLanjutanController::class, 'publishSoal']);
             Route::post('uji-lanjutan/{pendaftaran_id}/mulai', [AsesorUjiLanjutanController::class, 'mulaiUjian']);

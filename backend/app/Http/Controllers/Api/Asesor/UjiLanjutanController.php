@@ -120,6 +120,175 @@ class UjiLanjutanController extends Controller
     // ─── Save Items (instrumen) ───────────────────────────────────────────────
     // Catatan: durasi_menit sekarang diset oleh Admin Prodi, bukan asesor
 
+    public function copySources(Request $request, $id): JsonResponse
+    {
+        $asesorId = $request->user()->id;
+
+        if (!$this->getAsesorTugas((int) $id, $asesorId)) {
+            return response()->json(["message" => "Akses ditolak."], 403);
+        }
+
+        $target = Pendaftaran::findOrFail($id);
+
+        $sources = UjiLanjutan::with([
+            'pendaftaran.user:id,nama',
+            'items.mataKuliah:id,kode,nama',
+        ])
+            ->where('pendaftaran_id', '!=', $target->id)
+            ->whereHas('pendaftaran', function ($query) use ($target, $asesorId) {
+                $query->where('prodi_id', $target->prodi_id)
+                    ->whereHas('penugasanAsesor', fn ($q) => $q->where('asesor_id', $asesorId));
+            })
+            ->whereHas('items', fn ($query) => $query->whereNotNull('mata_kuliah_id'))
+            ->latest('instrumen_updated_at')
+            ->latest('updated_at')
+            ->limit(10)
+            ->get()
+            ->map(function (UjiLanjutan $uji) {
+                $mkGroups = $uji->items
+                    ->filter(fn (UjiLanjutanItem $item) => $item->mata_kuliah_id !== null)
+                    ->groupBy('mata_kuliah_id')
+                    ->map(function ($items) {
+                        $first = $items->first();
+
+                        return [
+                            'mata_kuliah_id' => $first->mata_kuliah_id,
+                            'kode' => $first->mataKuliah?->kode,
+                            'nama' => $first->mataKuliah?->nama,
+                            'jumlah_instrumen' => $items->count(),
+                        ];
+                    })
+                    ->values();
+
+                return [
+                    'id' => $uji->id,
+                    'pendaftaran_id' => $uji->pendaftaran_id,
+                    'pemohon_nama' => $uji->pendaftaran?->user?->nama,
+                    'fase_tulis' => $uji->fase_tulis,
+                    'instrumen_updated_at' => $uji->instrumen_updated_at,
+                    'updated_at' => $uji->updated_at,
+                    'jumlah_instrumen' => $uji->items->count(),
+                    'mata_kuliah' => $mkGroups,
+                ];
+            })
+            ->filter(fn (array $source) => $source['mata_kuliah']->isNotEmpty())
+            ->values();
+
+        return response()->json(['data' => $sources]);
+    }
+
+    public function copyItems(Request $request, $id): JsonResponse
+    {
+        $asesorId = $request->user()->id;
+
+        if (!$this->getAsesorTugas((int) $id, $asesorId)) {
+            return response()->json(["message" => "Akses ditolak."], 403);
+        }
+
+        $target = Pendaftaran::findOrFail($id);
+
+        $validated = $request->validate([
+            'source_uji_lanjutan_id' => [
+                'required',
+                'integer',
+                Rule::exists('uji_lanjutan', 'id'),
+            ],
+            'mata_kuliah_ids' => 'nullable|array',
+            'mata_kuliah_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('mata_kuliah', 'id')->where(
+                    fn ($query) => $query->where('prodi_id', $target->prodi_id),
+                ),
+            ],
+        ]);
+
+        $result = DB::transaction(function () use ($validated, $target, $asesorId) {
+            $lockedPendaftaran = Pendaftaran::whereKey($target->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless(
+                $lockedPendaftaran->status_alur === 'asesmen_tahap2',
+                409,
+                'Instrumen hanya dapat disalin pada tahap AT2.',
+            );
+
+            $targetUji = UjiLanjutan::firstOrCreate(
+                ['pendaftaran_id' => $lockedPendaftaran->id],
+                [
+                    'status' => 'menjadwalkan',
+                    'fase_tulis' => 'buat_soal',
+                    'dibuat_oleh' => $asesorId,
+                    'updated_by' => $asesorId,
+                ],
+            );
+            $lockedTargetUji = UjiLanjutan::whereKey($targetUji->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_if(
+                $lockedTargetUji->ujian_dimulai_at,
+                409,
+                'Instrumen tidak dapat disalin setelah ujian dimulai.',
+            );
+            abort_unless(
+                $lockedTargetUji->fase_tulis === 'buat_soal',
+                409,
+                'Instrumen hanya dapat disalin sebelum diterbitkan.',
+            );
+            abort_if(
+                (int) $lockedTargetUji->id === (int) $validated['source_uji_lanjutan_id'],
+                422,
+                'Sumber salinan tidak boleh sama dengan AT2 saat ini.',
+            );
+
+            $source = UjiLanjutan::with('pendaftaran')
+                ->whereKey($validated['source_uji_lanjutan_id'])
+                ->whereHas('pendaftaran', function ($query) use ($lockedPendaftaran, $asesorId) {
+                    $query->where('prodi_id', $lockedPendaftaran->prodi_id)
+                        ->whereHas('penugasanAsesor', fn ($q) => $q->where('asesor_id', $asesorId));
+                })
+                ->firstOrFail();
+
+            $sourceItems = UjiLanjutanItem::where('uji_lanjutan_id', $source->id)
+                ->whereNotNull('mata_kuliah_id')
+                ->whereHas('mataKuliah', fn ($query) => $query->where('prodi_id', $lockedPendaftaran->prodi_id));
+
+            if (! empty($validated['mata_kuliah_ids'])) {
+                $sourceItems->whereIn('mata_kuliah_id', $validated['mata_kuliah_ids']);
+            }
+
+            $items = $sourceItems->get();
+            abort_if($items->isEmpty(), 422, 'Tidak ada instrumen yang dapat disalin dari sumber tersebut.');
+
+            foreach ($items as $item) {
+                UjiLanjutanItem::create([
+                    'uji_lanjutan_id' => $lockedTargetUji->id,
+                    'tipe' => $item->tipe,
+                    'mata_kuliah_id' => $item->mata_kuliah_id,
+                    'pertanyaan_instruksi' => $item->pertanyaan_instruksi,
+                    'kunci_jawaban' => $item->kunci_jawaban,
+                ]);
+            }
+
+            $lockedTargetUji->update([
+                'updated_by' => $asesorId,
+                'instrumen_updated_at' => now(),
+            ]);
+
+            return [
+                'copied_count' => $items->count(),
+                'items' => $lockedTargetUji->items()
+                    ->with('mataKuliah:id,kode,nama')
+                    ->get(),
+            ];
+        });
+
+        return response()->json([
+            'message' => "{$result['copied_count']} instrumen berhasil disalin.",
+            'data' => $result,
+        ]);
+    }
+
     public function saveItems(Request $request, $id): JsonResponse
     {
         $asesorId = $request->user()->id;

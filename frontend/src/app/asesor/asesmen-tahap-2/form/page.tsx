@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  Copy,
   Key,
   Loader2,
   MapPin,
@@ -66,6 +67,21 @@ interface MkInstrumen {
   tipe: string;
   tipe_label: string;
   soal: Soal[];
+}
+interface CopySource {
+  id: number;
+  pendaftaran_id: number;
+  pemohon_nama: string | null;
+  fase_tulis: string;
+  instrumen_updated_at?: string | null;
+  updated_at?: string | null;
+  jumlah_instrumen: number;
+  mata_kuliah: Array<{
+    mata_kuliah_id: number;
+    kode?: string | null;
+    nama?: string | null;
+    jumlah_instrumen: number;
+  }>;
 }
 
 const AT2_METODE = [
@@ -173,6 +189,9 @@ function UjiLanjutanFormContent() {
   const [deletedItemIds, setDeletedItemIds] = useState<number[]>([]);
   const [catatan, setCatatan] = useState("");
   const [showAddMk, setShowAddMk] = useState(false);
+  const [showCopySource, setShowCopySource] = useState(false);
+  const [selectedCopySourceId, setSelectedCopySourceId] = useState("");
+  const [selectedCopyMkIds, setSelectedCopyMkIds] = useState<number[]>([]);
   const [newMk, setNewMk] = useState({ mata_kuliah_id: "" as number | "", tipe: "c3", tipe_label: "" });
   const [expandedMk, setExpandedMk] = useState<string | null>(null);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
@@ -204,6 +223,17 @@ function UjiLanjutanFormContent() {
   const isTidakHadir = faseTulis === "tidak_hadir";
   const isResultReadOnly = isSelesai || isTidakHadir;
   const mkPolibanList: MataKuliah[] = ujiLanjutan?.pendaftaran?.prodi?.mata_kuliah || [];
+
+  const { data: copySources = [] } = useQuery<CopySource[]>({
+    queryKey: ["asesor", "at2-copy-sources", pendaftaranId],
+    queryFn: async () => {
+      const res = await api.get(`/asesor/uji-lanjutan/${pendaftaranId}/copy-sources`);
+      return res.data?.data || [];
+    },
+    enabled: !!pendaftaranId && faseTulis === "buat_soal",
+    staleTime: 60_000,
+  });
+  const selectedCopySource = copySources.find((source) => source.id.toString() === selectedCopySourceId);
 
   // Info jadwal (set oleh Admin Prodi)
   const jadwalAdmin = {
@@ -300,6 +330,27 @@ function UjiLanjutanFormContent() {
     onError: (e: any) => toast.error(e.response?.data?.message || "Gagal submit penilaian"),
   });
 
+  const copyItemsMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedCopySource) throw new Error("Pilih sumber instrumen terlebih dahulu");
+
+      return api.post(`/asesor/uji-lanjutan/${pendaftaranId}/copy`, {
+        source_uji_lanjutan_id: selectedCopySource.id,
+        mata_kuliah_ids: selectedCopyMkIds.length > 0 ? selectedCopyMkIds : undefined,
+      });
+    },
+    onSuccess: (res: any) => {
+      setDeletedItemIds([]);
+      setSelectedCopySourceId("");
+      setSelectedCopyMkIds([]);
+      setShowCopySource(false);
+      queryClient.invalidateQueries({ queryKey: ["asesor", "at2-form"] });
+      queryClient.invalidateQueries({ queryKey: ["asesor", "at2-copy-sources"] });
+      toast.success(res.data?.message || "Instrumen berhasil disalin");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || e.message || "Gagal menyalin instrumen"),
+  });
+
   // MK/Soal handlers
   const handleTambahMk = () => {
     if (!newMk.mata_kuliah_id) { toast.error("Pilih mata kuliah terlebih dahulu"); return; }
@@ -309,6 +360,13 @@ function UjiLanjutanFormContent() {
     setExpandedMk(key);
     setNewMk({ mata_kuliah_id: "", tipe: "c3", tipe_label: "" });
     setShowAddMk(false);
+  };
+  const toggleCopyMk = (mkId: number) => {
+    setSelectedCopyMkIds((prev) =>
+      prev.includes(mkId)
+        ? prev.filter((id) => id !== mkId)
+        : [...prev, mkId],
+    );
   };
   const tambahSoal = (gi: number) => setMkGroups((p) => p.map((g, i) => i === gi ? { ...g, soal: [...g.soal, { pertanyaan_instruksi: "", kunci_jawaban: "" }] } : g));
   const markDeletedItems = (ids: Array<number | undefined>) => {
@@ -599,6 +657,161 @@ function UjiLanjutanFormContent() {
                 <p><strong className="text-foreground">C3 Tertulis:</strong> Soal jawaban singkat dikerjakan pemohon secara online, sertakan kunci jawaban</p>
                 <p><strong className="text-foreground">C4 Demonstrasi:</strong> Instruksi peragaan kemampuan secara langsung</p>
               </div>
+
+              <div className="mb-4 grid gap-3 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddMk(true);
+                    setShowCopySource(false);
+                  }}
+                  className="rounded-xl border bg-background p-4 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+                >
+                  <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <Plus className="h-4 w-4 text-primary" />
+                    Buat instrumen manual
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tambahkan metode dan butir instrumen baru untuk pemohon ini.
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  disabled={copySources.length === 0}
+                  onClick={() => {
+                    setShowCopySource((value) => !value);
+                    setShowAddMk(false);
+                  }}
+                  className="rounded-xl border bg-background p-4 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border disabled:hover:bg-background"
+                >
+                  <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <Copy className="h-4 w-4 text-primary" />
+                    Salin dari instrumen sebelumnya
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {copySources.length > 0
+                      ? `${copySources.length} sumber tersedia dari AT2 sebelumnya.`
+                      : "Belum ada instrumen sebelumnya yang bisa disalin."}
+                  </p>
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {showCopySource && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="mb-4 rounded-xl border-2 border-dashed border-primary/30 p-4 space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-foreground">Salin Instrumen AT2</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Instrumen disalin sebagai item baru. Jawaban dan nilai lama tidak ikut disalin.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCopySource(false);
+                          setSelectedCopySourceId("");
+                          setSelectedCopyMkIds([]);
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-muted-foreground">Sumber Instrumen</Label>
+                      <Select
+                        value={selectedCopySourceId}
+                        onValueChange={(value) => {
+                          setSelectedCopySourceId(value ?? "");
+                          setSelectedCopyMkIds([]);
+                        }}
+                      >
+                        <SelectTrigger className="bg-background h-9 text-sm">
+                          <SelectValue placeholder="Pilih instrumen sebelumnya..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {copySources.map((source) => (
+                            <SelectItem key={source.id} value={source.id.toString()}>
+                              <div className="flex flex-col py-0.5">
+                                <span className="font-medium">{source.pemohon_nama || "Pemohon tanpa nama"}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {source.jumlah_instrumen} instrumen
+                                  {source.updated_at
+                                    ? ` · ${new Date(source.updated_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`
+                                    : ""}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedCopySource && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label className="text-xs font-bold text-muted-foreground">Mata Kuliah yang Disalin</Label>
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline"
+                            onClick={() => setSelectedCopyMkIds([])}
+                          >
+                            Salin semua
+                          </button>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {selectedCopySource.mata_kuliah.map((mk) => {
+                            const checked = selectedCopyMkIds.includes(mk.mata_kuliah_id);
+                            return (
+                              <label
+                                key={mk.mata_kuliah_id}
+                                className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm transition-colors ${checked ? "border-primary/60 bg-primary/5" : "bg-background hover:bg-muted/30"}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="mt-1 h-4 w-4 rounded border-border"
+                                  checked={checked}
+                                  onChange={() => toggleCopyMk(mk.mata_kuliah_id)}
+                                />
+                                <span className="min-w-0">
+                                  <span className="block font-semibold text-foreground truncate">{mk.nama || "Mata Kuliah"}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {mk.kode || "MK"} · {mk.jumlah_instrumen} instrumen
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Jika tidak ada MK yang dicentang, sistem akan menyalin semua MK dari sumber ini.
+                        </p>
+                      </div>
+                    )}
+
+                    <Button
+                      size="sm"
+                      className="w-full gap-2 h-9"
+                      disabled={!selectedCopySource || copyItemsMutation.isPending}
+                      onClick={() => copyItemsMutation.mutate()}
+                    >
+                      {copyItemsMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      {copyItemsMutation.isPending ? "Menyalin..." : "Salin Instrumen"}
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Daftar MK */}
               <div className="space-y-3">
