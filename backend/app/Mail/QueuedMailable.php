@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Services\Telemetry\Metrics;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Mail\Mailable;
 use Throwable;
 
@@ -28,6 +29,12 @@ abstract class QueuedMailable extends Mailable implements ShouldQueue
         app(Metrics::class)->increment('mail.failure', 1, [
             'mailable' => static::class,
             'exception' => $exception::class,
+        ]);
+
+        Log::warning('mail.job.failed', [
+            'mailable' => static::class,
+            'exception' => $exception::class,
+            'message' => $exception->getMessage(),
         ]);
     }
 }

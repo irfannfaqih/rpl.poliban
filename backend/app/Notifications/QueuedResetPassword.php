@@ -3,9 +3,12 @@
 namespace App\Notifications;
 
 use App\Mail\ResetPasswordMail;
+use App\Services\Telemetry\Metrics;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class QueuedResetPassword extends ResetPassword implements ShouldQueue
 {
@@ -29,5 +32,19 @@ class QueuedResetPassword extends ResetPassword implements ShouldQueue
     public function backoff(): array
     {
         return [10, 60, 300];
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        app(Metrics::class)->increment('mail.failure', 1, [
+            'notification' => static::class,
+            'exception' => $exception::class,
+        ]);
+
+        Log::warning('password.reset.notification.failed', [
+            'notification' => static::class,
+            'exception' => $exception::class,
+            'message' => $exception->getMessage(),
+        ]);
     }
 }
