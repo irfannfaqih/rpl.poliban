@@ -50,6 +50,7 @@ interface UserData {
 const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Admin",
   admin_prodi: "Admin Prodi",
+  kaprodi: "Kaprodi",
   asesor: "Asesor",
   pimpinan: "Pimpinan",
   pemohon: "Pemohon",
@@ -58,6 +59,7 @@ const ROLE_LABEL: Record<string, string> = {
 const ROLE_COLOR: Record<string, string> = {
   super_admin: "bg-red-50 text-red-700 border-red-200",
   admin_prodi: "bg-purple-50 text-purple-700 border-purple-200",
+  kaprodi: "bg-emerald-50 text-emerald-700 border-emerald-200",
   asesor: "bg-blue-50 text-blue-700 border-blue-200",
   pimpinan: "bg-amber-50 text-amber-700 border-amber-200",
   pemohon: "bg-slate-50 text-slate-700 border-slate-200",
@@ -271,6 +273,7 @@ export default function ManajemenPenggunaPage() {
               <SelectItem value="all">Semua Role</SelectItem>
               <SelectItem value="asesor">Asesor</SelectItem>
               <SelectItem value="admin_prodi">Admin Prodi</SelectItem>
+              <SelectItem value="kaprodi">Kaprodi</SelectItem>
               <SelectItem value="pimpinan">Pimpinan</SelectItem>
               <SelectItem value="pemohon">Pemohon</SelectItem>
             </SelectContent>
@@ -593,6 +596,7 @@ export default function ManajemenPenggunaPage() {
                     <SelectContent>
                       <SelectItem value="asesor">Asesor</SelectItem>
                       <SelectItem value="admin_prodi">Admin Prodi</SelectItem>
+                      <SelectItem value="kaprodi">Kaprodi</SelectItem>
                       <SelectItem value="pimpinan">Pimpinan</SelectItem>
                       <SelectItem value="super_admin">Super Admin</SelectItem>
                     </SelectContent>

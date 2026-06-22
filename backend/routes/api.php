@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\Pemohon\BorangController;
 use App\Http\Controllers\Api\Pemohon\PembayaranController;
 use App\Http\Controllers\Api\Pemohon\PemohonExtraController;
 use App\Http\Controllers\Api\Pemohon\UjiLanjutanController as PemohonUjiLanjutanController;
+use App\Http\Controllers\Api\Kaprodi\PlenoApprovalController as KaprodiPlenoApprovalController;
 use App\Http\Controllers\Api\Pimpinan\PimpinanController as PimpinanCtrl;
 use App\Http\Controllers\Api\PrivateFileController;
 use App\Http\Controllers\Api\PublicController;
@@ -182,15 +183,6 @@ Route::middleware('auth:sanctum')->group(function () {
                 PlenoController::class,
                 'finalize',
             ]);
-            Route::post('/pleno/{pendaftaran}/kaprodi/approve', [
-                PlenoController::class,
-                'kaprodiApprove',
-            ]);
-            Route::post('/pleno/{pendaftaran}/kaprodi/reject', [
-                PlenoController::class,
-                'kaprodiReject',
-            ]);
-
             // Arsip
             Route::get('/arsip', [
                 ArsipController::class,
@@ -219,6 +211,16 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/pendaftaran/{pendaftaran_id}/at2', [AdminProdiUjiLanjutanController::class, 'show']);
             Route::post('/pendaftaran/{pendaftaran_id}/at2/reschedule/approve', [AdminProdiUjiLanjutanController::class, 'approveReschedule']);
             Route::post('/pendaftaran/{pendaftaran_id}/at2/reschedule/reject', [AdminProdiUjiLanjutanController::class, 'rejectReschedule']);
+        });
+
+    // â”€â”€â”€ Kaprodi â”€â”€â”€
+    Route::middleware('role:kaprodi')
+        ->prefix('kaprodi')
+        ->group(function () {
+            Route::get('pleno-approvals', [KaprodiPlenoApprovalController::class, 'index']);
+            Route::get('pleno-approvals/{approval}', [KaprodiPlenoApprovalController::class, 'show']);
+            Route::post('pleno-approvals/{approval}/approve', [KaprodiPlenoApprovalController::class, 'approve']);
+            Route::post('pleno-approvals/{approval}/reject', [KaprodiPlenoApprovalController::class, 'reject']);
         });
 
     // ─── Asesor ───

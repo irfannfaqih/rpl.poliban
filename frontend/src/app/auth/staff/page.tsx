@@ -46,6 +46,8 @@ export default function StaffLoginPage() {
     const emailLower = email.toLowerCase();
     if (emailLower.startsWith("admin")) {
       router.push("/admin-prodi/dashboard");
+    } else if (emailLower.startsWith("kaprodi")) {
+      router.push("/kaprodi/pleno-approval");
     } else if (emailLower.startsWith("super")) {
       setError("Portal Super Admin belum tersedia.");
     } else {

@@ -20,7 +20,7 @@ interface User {
   nama: string;
   email: string;
   nip: string | null;
-  role: "pemohon" | "admin_prodi" | "asesor" | "pimpinan" | "super_admin";
+  role: "pemohon" | "admin_prodi" | "kaprodi" | "asesor" | "pimpinan" | "super_admin";
   status_alur?: StatusAlur | null;
   prodi: Prodi | null;
   jabatan: string | null;
@@ -47,6 +47,7 @@ interface AuthState {
 const ROLE_DASHBOARD_MAP: Record<string, string> = {
   pemohon: "/pemohon/dashboard",
   admin_prodi: "/admin-prodi/dashboard",
+  kaprodi: "/kaprodi/pleno-approval",
   asesor: "/asesor/dashboard",
   pimpinan: "/pimpinan/dashboard",
   super_admin: "/super-admin/gelombang",

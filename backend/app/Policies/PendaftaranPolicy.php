@@ -12,7 +12,7 @@ class PendaftaranPolicy
     {
         return match($user->role) {
             'pemohon'     => $user->id === $pendaftaran->user_id,
-            'admin_prodi' => $user->prodi_id === $pendaftaran->prodi_id,
+            'admin_prodi', 'kaprodi' => $user->prodi_id === $pendaftaran->prodi_id,
             'asesor'      => $pendaftaran->penugasanAsesor()
                                 ->where('asesor_id', $user->id)
                                 ->exists(),

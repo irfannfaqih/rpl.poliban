@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import {
   BarChart4,
   ChevronRight,
+  ClipboardCheck,
   FileBadge,
   KeyRound,
   LogOut,
@@ -58,6 +59,7 @@ function PimpinanHeader() {
 
 const sidebarLinks = [
   { href: "/pimpinan/dashboard", label: "Dashboard", icon: BarChart4 },
+  { href: "/pimpinan/pleno-approval", label: "Approval Pleno", icon: ClipboardCheck },
   { href: "/pimpinan/sk-pusat", label: "Penerbitan SK Pusat", icon: FileBadge },
   { href: "/pimpinan/profil", label: "Profil Pimpinan", icon: User },
 ];

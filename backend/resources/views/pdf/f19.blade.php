@@ -39,6 +39,11 @@
     $jumlahAsesor = count($asesorList);
     $jumlahKolom = $jumlahAsesor + 1; // +1 untuk kolom Pemohon
     $lebarKolom = round(100 / $jumlahKolom, 2);
+    $approval = $pendaftaran->plenoApproval ?? null;
+    $namaKaprodi = $approval?->kaprodiApprover?->nama ?? '-';
+    $tanggalKaprodi = $approval?->kaprodi_approved_at ? \Carbon\Carbon::parse($approval->kaprodi_approved_at)->translatedFormat('d F Y H:i') : '-';
+    $namaPimpinan = $approval?->pimpinanApprover?->nama ?? '-';
+    $tanggalPimpinan = $approval?->pimpinan_approved_at ? \Carbon\Carbon::parse($approval->pimpinan_approved_at)->translatedFormat('d F Y H:i') : '-';
 @endphp
 
 <div class="doc-kode">F19</div>
@@ -62,6 +67,21 @@
         <td>Semua Mata Kuliah yang Diajukan</td>
         <td>Tempat</td>
         <td>{{ $tempatUjian }}</td>
+    </tr>
+</table>
+
+<table class="table-info" style="font-size: 9.5px; margin-bottom: 10px;">
+    <tr>
+        <td>Approval Kaprodi</td>
+        <td>{{ $namaKaprodi }}</td>
+        <td>Tanggal Approval Kaprodi</td>
+        <td>{{ $tanggalKaprodi }}</td>
+    </tr>
+    <tr>
+        <td>Approval Pimpinan</td>
+        <td>{{ $namaPimpinan }}</td>
+        <td>Tanggal Approval Pimpinan</td>
+        <td>{{ $tanggalPimpinan }}</td>
     </tr>
 </table>
 

@@ -38,8 +38,6 @@ export default function DashboardPlenoPage() {
   const queryClient = useQueryClient();
   const [selectedPemohon, setSelectedPemohon] = useState<string>("");
   const [isSahkanOpen, setIsSahkanOpen] = useState(false);
-  const [isKaprodiRejectOpen, setIsKaprodiRejectOpen] = useState(false);
-  const [kaprodiRejectNote, setKaprodiRejectNote] = useState("");
   const [keputusanFinal, setKeputusanFinal] = useState<Record<string, string>>({});
   const [catatanPleno, setCatatanPleno] = useState<Record<string, string>>({});
 
@@ -130,32 +128,6 @@ export default function DashboardPlenoPage() {
     onError: () => {
       toast.error("Gagal mengesahkan sidang pleno.");
     }
-  });
-
-  const kaprodiApproveMutation = useMutation({
-    mutationFn: () => api.post(`/admin-prodi/pleno/${selectedPemohon}/kaprodi/approve`),
-    onSuccess: () => {
-      toast.success("Pleno disetujui Kaprodi dan dikirim ke Pimpinan.");
-      queryClient.invalidateQueries({ queryKey: ['pleno-list'] });
-      queryClient.invalidateQueries({ queryKey: ['pleno-detail', selectedPemohon] });
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || "Gagal menyetujui pleno.");
-    },
-  });
-
-  const kaprodiRejectMutation = useMutation({
-    mutationFn: () => api.post(`/admin-prodi/pleno/${selectedPemohon}/kaprodi/reject`, { catatan: kaprodiRejectNote }),
-    onSuccess: () => {
-      toast.success("Pleno ditolak Kaprodi dan dapat direvisi.");
-      setIsKaprodiRejectOpen(false);
-      setKaprodiRejectNote("");
-      queryClient.invalidateQueries({ queryKey: ['pleno-list'] });
-      queryClient.invalidateQueries({ queryKey: ['pleno-detail', selectedPemohon] });
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || "Gagal menolak pleno.");
-    },
   });
 
   const conflictRows = plenoMkList.filter((mk: any) => mk.status === "konflik" || mk.status === "selisih_mayor");
@@ -451,55 +423,6 @@ export default function DashboardPlenoPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-                {approvalStatus === "menunggu_approval_kaprodi" && (
-                  <>
-                    <Button
-                      size="sm"
-                      className="h-9 text-xs bg-blue-600 text-white hover:bg-blue-700 gap-1.5"
-                      disabled={kaprodiApproveMutation.isPending}
-                      onClick={() => kaprodiApproveMutation.mutate()}
-                    >
-                      {kaprodiApproveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                      Approve Kaprodi
-                    </Button>
-                    <Dialog open={isKaprodiRejectOpen} onOpenChange={setIsKaprodiRejectOpen}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 text-xs text-red-600 border-red-200 hover:bg-red-50 gap-1.5"
-                        onClick={() => setIsKaprodiRejectOpen(true)}
-                      >
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        Reject
-                      </Button>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Tolak Pleno?</DialogTitle>
-                          <DialogDescription>
-                            Catatan wajib diisi agar Admin Prodi dapat memperbaiki keputusan pleno.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <Textarea
-                          value={kaprodiRejectNote}
-                          onChange={(e) => setKaprodiRejectNote(e.target.value)}
-                          placeholder="Tuliskan alasan penolakan..."
-                          className="min-h-[120px]"
-                        />
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsKaprodiRejectOpen(false)} disabled={kaprodiRejectMutation.isPending}>Batal</Button>
-                          <Button
-                            className="bg-red-600 text-white hover:bg-red-700"
-                            disabled={!kaprodiRejectNote.trim() || kaprodiRejectMutation.isPending}
-                            onClick={() => kaprodiRejectMutation.mutate()}
-                          >
-                            {kaprodiRejectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                            Tolak Pleno
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </>
-                )}
               </div>
             </div>
 

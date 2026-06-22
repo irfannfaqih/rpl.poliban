@@ -77,6 +77,7 @@ class PenggunaController extends Controller
                 Rule::in([
                     "pemohon",
                     "admin_prodi",
+                    "kaprodi",
                     "asesor",
                     "pimpinan",
                     "super_admin",
@@ -128,6 +129,7 @@ class PenggunaController extends Controller
                 Rule::in([
                     "pemohon",
                     "admin_prodi",
+                    "kaprodi",
                     "asesor",
                     "pimpinan",
                     "super_admin",

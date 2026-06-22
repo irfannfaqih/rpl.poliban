@@ -6,7 +6,6 @@ import {
   Search, 
   CheckCircle2, 
   XCircle,
-  FileText,
   Stamp,
   Filter,
   Loader2,
@@ -34,27 +33,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 export default function PenerbitanSKPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [rejectApprovalId, setRejectApprovalId] = useState<number | null>(null);
-  const [rejectNote, setRejectNote] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [nomorSkInput, setNomorSkInput] = useState("");
-
-  const { data: approvalList = [] } = useQuery({
-    queryKey: ["pimpinan-pleno-approvals"],
-    queryFn: async () => {
-      const { data } = await api.get("/pimpinan/pleno-approvals", {
-        params: { status: "menunggu_approval_pimpinan" },
-      });
-      return data.data || [];
-    }
-  });
 
   const { data: skList = [], isLoading, error } = useQuery({
     queryKey: ["pimpinan-sk-list", statusFilter],
@@ -77,7 +63,6 @@ export default function PenerbitanSKPage() {
 
   const waitingCount = skList.filter((k: any) => k.status === "menunggu_sk").length;
   const publishedCount = skList.filter((k: any) => k.status === "sk_terbit").length;
-  const waitingApprovalCount = approvalList.length;
 
   const toggleSelectAll = () => {
     const listWaiting = filteredKandidat.filter((k: any) => k.status === "menunggu_sk");
@@ -120,33 +105,6 @@ export default function PenerbitanSKPage() {
     }
   });
 
-  const approvePlenoMutation = useMutation({
-    mutationFn: (approvalId: number) => api.post(`/pimpinan/pleno-approvals/${approvalId}/approve`),
-    onSuccess: () => {
-      toast.success("Pleno disetujui. SK siap diterbitkan.");
-      queryClient.invalidateQueries({ queryKey: ["pimpinan-pleno-approvals"] });
-      queryClient.invalidateQueries({ queryKey: ["pimpinan-sk-list"] });
-      queryClient.invalidateQueries({ queryKey: ["pimpinan-dashboard"] });
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || "Gagal menyetujui pleno.");
-    },
-  });
-
-  const rejectPlenoMutation = useMutation({
-    mutationFn: () => api.post(`/pimpinan/pleno-approvals/${rejectApprovalId}/reject`, { catatan: rejectNote }),
-    onSuccess: () => {
-      toast.success("Pleno ditolak dan dikembalikan ke Admin Prodi.");
-      setRejectApprovalId(null);
-      setRejectNote("");
-      queryClient.invalidateQueries({ queryKey: ["pimpinan-pleno-approvals"] });
-      queryClient.invalidateQueries({ queryKey: ["pimpinan-dashboard"] });
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || "Gagal menolak pleno.");
-    },
-  });
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
@@ -178,20 +136,13 @@ export default function PenerbitanSKPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
          <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-xl border border-emerald-100 dark:border-emerald-900 p-4 flex items-center justify-between">
             <div>
               <div className="text-emerald-700 dark:text-emerald-400 font-bold text-sm">Siap Diterbitkan</div>
               <div className="text-3xl font-black text-emerald-800 dark:text-emerald-500 mt-1">{waitingCount}</div>
             </div>
             <Stamp className="h-10 w-10 text-emerald-200 dark:text-emerald-800" />
-         </div>
-         <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-100 dark:border-amber-900 p-4 flex items-center justify-between">
-            <div>
-              <div className="text-amber-700 dark:text-amber-400 font-bold text-sm">Approval Pleno</div>
-              <div className="text-3xl font-black text-amber-800 dark:text-amber-500 mt-1">{waitingApprovalCount}</div>
-            </div>
-            <FileText className="h-10 w-10 text-amber-200 dark:text-amber-800" />
          </div>
          <div className="bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900 p-4 flex items-center justify-between">
             <div>
@@ -202,78 +153,6 @@ export default function PenerbitanSKPage() {
             </div>
             <FileBadge className="h-10 w-10 text-blue-200 dark:text-blue-800" />
          </div>
-      </div>
-
-      <div className="bg-card rounded-2xl border shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b bg-muted/20 flex items-center justify-between">
-          <div>
-            <h2 className="font-bold text-sm">Approval Berita Acara Pleno</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Setujui pleno final sebelum F19 dan SK dapat diproses.</p>
-          </div>
-          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">{waitingApprovalCount} menunggu</Badge>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground bg-muted/10 border-b uppercase tracking-wider">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Pemohon</th>
-                <th className="px-5 py-3 font-semibold">Prodi</th>
-                <th className="px-5 py-3 font-semibold text-center">MK Diakui</th>
-                <th className="px-5 py-3 font-semibold">Kaprodi</th>
-                <th className="px-5 py-3 font-semibold text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {approvalList.map((approval: any) => {
-                const pleno = approval.pendaftaran?.pleno_mk || [];
-                const accepted = pleno.filter((item: any) => item.keputusan_final && item.keputusan_final !== "T");
-                return (
-                  <tr key={approval.id} className="hover:bg-muted/10">
-                    <td className="px-5 py-4">
-                      <div className="font-bold text-foreground">{approval.pendaftaran?.user?.nama || "-"}</div>
-                      <div className="text-[11px] text-muted-foreground font-mono mt-0.5">{approval.pendaftaran?.nomor_pendaftaran || `RPL-${approval.pendaftaran_id}`}</div>
-                    </td>
-                    <td className="px-5 py-4">{approval.pendaftaran?.prodi?.nama || "-"}</td>
-                    <td className="px-5 py-4 text-center">
-                      <span className="font-bold text-emerald-600">{accepted.length}</span>
-                    </td>
-                    <td className="px-5 py-4 text-xs">
-                      {approval.kaprodi_approver?.nama || "-"}
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          className="h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700"
-                          disabled={approvePlenoMutation.isPending}
-                          onClick={() => approvePlenoMutation.mutate(approval.id)}
-                        >
-                          {approvePlenoMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => setRejectApprovalId(approval.id)}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {approvalList.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">
-                    Tidak ada pleno yang menunggu approval pimpinan.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card p-4 rounded-xl border shadow-sm">
@@ -463,38 +342,6 @@ export default function PenerbitanSKPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={rejectApprovalId !== null} onOpenChange={(open) => {
-        if (!open) {
-          setRejectApprovalId(null);
-          setRejectNote("");
-        }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Tolak Approval Pleno?</DialogTitle>
-            <DialogDescription>
-              Catatan wajib diisi agar Admin Prodi dapat memperbaiki hasil pleno.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={rejectNote}
-            onChange={(e) => setRejectNote(e.target.value)}
-            placeholder="Tuliskan alasan penolakan..."
-            className="min-h-[120px]"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectApprovalId(null)} disabled={rejectPlenoMutation.isPending}>Batal</Button>
-            <Button
-              className="bg-red-600 text-white hover:bg-red-700"
-              disabled={!rejectNote.trim() || rejectPlenoMutation.isPending}
-              onClick={() => rejectPlenoMutation.mutate()}
-            >
-              {rejectPlenoMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              Tolak Pleno
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

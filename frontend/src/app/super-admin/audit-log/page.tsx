@@ -64,7 +64,7 @@ export default function AuditLogPage() {
 
   const ROLE_LABEL: Record<string, string> = {
     super_admin: 'Super Admin', admin_prodi: 'Admin Prodi',
-    asesor: 'Asesor', pimpinan: 'Pimpinan', pemohon: 'Pemohon',
+    kaprodi: 'Kaprodi', asesor: 'Asesor', pimpinan: 'Pimpinan', pemohon: 'Pemohon',
   };
 
   return (

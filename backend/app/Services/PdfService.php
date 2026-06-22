@@ -85,7 +85,10 @@ class PdfService
         'F18' => ['prodi', 'plenoMk.mataKuliah'],
 
         // F19 - Berita Acara Asesmen
-        'F19' => ['dataDiri', 'prodi', 'penugasanAsesor.asesor', 'ujiLanjutan'],
+        'F19' => [
+            'dataDiri', 'prodi', 'penugasanAsesor.asesor', 'ujiLanjutan',
+            'plenoApproval.kaprodiApprover', 'plenoApproval.pimpinanApprover',
+        ],
 
         // REKAP - Rekap keseluruhan
         'REKAP' => ['dataDiri', 'prodi', 'riwayatPendidikan', 'pengalamanKerja', 'plenoMk.mataKuliah'],
