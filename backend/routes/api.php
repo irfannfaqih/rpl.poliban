@@ -182,6 +182,14 @@ Route::middleware('auth:sanctum')->group(function () {
                 PlenoController::class,
                 'finalize',
             ]);
+            Route::post('/pleno/{pendaftaran}/kaprodi/approve', [
+                PlenoController::class,
+                'kaprodiApprove',
+            ]);
+            Route::post('/pleno/{pendaftaran}/kaprodi/reject', [
+                PlenoController::class,
+                'kaprodiReject',
+            ]);
 
             // Arsip
             Route::get('/arsip', [
@@ -269,6 +277,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->prefix('pimpinan')
         ->group(function () {
             Route::get('dashboard', [PimpinanCtrl::class, 'dashboard']);
+            Route::get('pleno-approvals', [PimpinanCtrl::class, 'listPlenoApprovals']);
+            Route::post('pleno-approvals/{approval}/approve', [PimpinanCtrl::class, 'approvePleno']);
+            Route::post('pleno-approvals/{approval}/reject', [PimpinanCtrl::class, 'rejectPleno']);
             Route::get('sk', [PimpinanCtrl::class, 'listSk']);
             Route::post('sk/{sk}/terbitkan', [
                 PimpinanCtrl::class,

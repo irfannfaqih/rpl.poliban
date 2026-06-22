@@ -38,6 +38,8 @@ export default function DashboardPlenoPage() {
   const queryClient = useQueryClient();
   const [selectedPemohon, setSelectedPemohon] = useState<string>("");
   const [isSahkanOpen, setIsSahkanOpen] = useState(false);
+  const [isKaprodiRejectOpen, setIsKaprodiRejectOpen] = useState(false);
+  const [kaprodiRejectNote, setKaprodiRejectNote] = useState("");
   const [keputusanFinal, setKeputusanFinal] = useState<Record<string, string>>({});
   const [catatanPleno, setCatatanPleno] = useState<Record<string, string>>({});
 
@@ -62,6 +64,9 @@ export default function DashboardPlenoPage() {
   });
 
   const plenoMkList = detailData?.pleno_mk || [];
+  const approval = detailData?.pleno_approval;
+  const approvalStatus = approval?.status;
+  const isApprovalLocked = ["menunggu_approval_kaprodi", "menunggu_approval_pimpinan", "approved_final"].includes(approvalStatus);
 
   // Sinkronisasi data awal
   useEffect(() => {
@@ -117,14 +122,40 @@ export default function DashboardPlenoPage() {
       return api.post(`/admin-prodi/pleno/${selectedPemohon}/finalize`);
     },
     onSuccess: () => {
-      toast.success("Sidang Pleno berhasil disahkan!");
+      toast.success("Pleno berhasil dikirim ke approval Kaprodi!");
       setIsSahkanOpen(false);
-      setSelectedPemohon("");
       queryClient.invalidateQueries({ queryKey: ['pleno-list'] });
+      queryClient.invalidateQueries({ queryKey: ['pleno-detail', selectedPemohon] });
     },
     onError: () => {
       toast.error("Gagal mengesahkan sidang pleno.");
     }
+  });
+
+  const kaprodiApproveMutation = useMutation({
+    mutationFn: () => api.post(`/admin-prodi/pleno/${selectedPemohon}/kaprodi/approve`),
+    onSuccess: () => {
+      toast.success("Pleno disetujui Kaprodi dan dikirim ke Pimpinan.");
+      queryClient.invalidateQueries({ queryKey: ['pleno-list'] });
+      queryClient.invalidateQueries({ queryKey: ['pleno-detail', selectedPemohon] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || "Gagal menyetujui pleno.");
+    },
+  });
+
+  const kaprodiRejectMutation = useMutation({
+    mutationFn: () => api.post(`/admin-prodi/pleno/${selectedPemohon}/kaprodi/reject`, { catatan: kaprodiRejectNote }),
+    onSuccess: () => {
+      toast.success("Pleno ditolak Kaprodi dan dapat direvisi.");
+      setIsKaprodiRejectOpen(false);
+      setKaprodiRejectNote("");
+      queryClient.invalidateQueries({ queryKey: ['pleno-list'] });
+      queryClient.invalidateQueries({ queryKey: ['pleno-detail', selectedPemohon] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || "Gagal menolak pleno.");
+    },
   });
 
   const conflictRows = plenoMkList.filter((mk: any) => mk.status === "konflik" || mk.status === "selisih_mayor");
@@ -134,7 +165,29 @@ export default function DashboardPlenoPage() {
     return hasDecision && hasNote;
   });
   const isAlreadyFinished = detailData?.status_alur === 'finished';
-  const canSahkan = selectedPemohon && allConflictsResolved && !isAlreadyFinished;
+  const canSahkan = selectedPemohon && allConflictsResolved && !isAlreadyFinished && !isApprovalLocked;
+
+  const approvalLabel = (status?: string) => {
+    switch (status) {
+      case "menunggu_approval_kaprodi": return "Menunggu Approval Kaprodi";
+      case "ditolak_kaprodi": return "Ditolak Kaprodi";
+      case "menunggu_approval_pimpinan": return "Menunggu Approval Pimpinan";
+      case "ditolak_pimpinan": return "Ditolak Pimpinan";
+      case "approved_final": return "Approved Final";
+      default: return "Belum Diajukan";
+    }
+  };
+
+  const approvalClass = (status?: string) => {
+    switch (status) {
+      case "approved_final": return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "ditolak_kaprodi":
+      case "ditolak_pimpinan": return "bg-red-50 text-red-700 border-red-200";
+      case "menunggu_approval_kaprodi":
+      case "menunggu_approval_pimpinan": return "bg-amber-50 text-amber-700 border-amber-200";
+      default: return "bg-slate-50 text-slate-600 border-slate-200";
+    }
+  };
 
   const getStatusRowClass = (status: string) => {
     switch (status) {
@@ -210,8 +263,8 @@ export default function DashboardPlenoPage() {
       window.URL.revokeObjectURL(url);
       link.parentNode?.removeChild(link);
       toast.success(`PDF ${kode} berhasil diunduh`, { id: toastId });
-    } catch {
-      toast.error(`Gagal membuat PDF ${kode}`, { id: toastId });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || `Gagal membuat PDF ${kode}`, { id: toastId });
     }
   };
 
@@ -281,6 +334,19 @@ export default function DashboardPlenoPage() {
             <Download className="h-3.5 w-3.5" />
             Rekap Asesmen Pemohon (F15)
           </Button>
+          <Button
+            size="sm"
+            className="gap-2 h-9 text-xs bg-slate-800 text-white hover:bg-slate-900 border-transparent cursor-pointer"
+            disabled={!selectedPemohon || approvalStatus !== "approved_final"}
+            title={approvalStatus === "approved_final" ? "Unduh Berita Acara F19" : "F19 menunggu approval Kaprodi dan Pimpinan"}
+            onClick={() => {
+              const nama = detailData?.user?.nama?.replace(/\s+/g, "_") || selectedPemohon;
+              handleDownloadPdf("F19", `F19_Berita_Acara_Asesmen_${nama}.pdf`);
+            }}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Berita Acara (F19)
+          </Button>
         </div>
       </div>
 
@@ -319,6 +385,17 @@ export default function DashboardPlenoPage() {
                     <CheckCircle2 className="h-3 w-3" /> Pleno telah disahkan - hanya bisa download dokumen
                   </p>
                 )}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className={`text-[11px] ${approvalClass(approvalStatus)}`}>
+                    {approvalLabel(approvalStatus)}
+                  </Badge>
+                  {approval?.kaprodi_catatan && (
+                    <span className="text-[11px] text-red-600">Catatan Kaprodi: {approval.kaprodi_catatan}</span>
+                  )}
+                  {approval?.pimpinan_catatan && (
+                    <span className="text-[11px] text-red-600">Catatan Pimpinan: {approval.pimpinan_catatan}</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2">
@@ -326,7 +403,7 @@ export default function DashboardPlenoPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => saveDraftMutation.mutate()}
-                  disabled={saveDraftMutation.isPending || !selectedPemohon}
+                  disabled={saveDraftMutation.isPending || !selectedPemohon || isApprovalLocked}
                   className="h-9 text-xs gap-1.5 cursor-pointer"
                 >
                   {saveDraftMutation.isPending ? (
@@ -348,9 +425,9 @@ export default function DashboardPlenoPage() {
                   </Button>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Sahkan Nilai Pleno?</DialogTitle>
+                      <DialogTitle>Kirim Pleno ke Approval Kaprodi?</DialogTitle>
                       <DialogDescription>
-                        Dengan mengesahkan, Anda menyatakan bahwa proses diskusi pleno telah selesai dan nilai akhir disetujui oleh kedua Asesor dan Prodi.
+                        Setelah dikirim, keputusan pleno terkunci sampai Kaprodi menyetujui atau menolak untuk revisi.
                       </DialogDescription>
                     </DialogHeader>
                     {conflictRows.length > 0 && (
@@ -369,11 +446,60 @@ export default function DashboardPlenoPage() {
                         {saveMutation.isPending ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
                         ) : null}
-                        {saveMutation.isPending ? "Menyimpan..." : "Ya, Sahkan Pleno"}
+                        {saveMutation.isPending ? "Mengirim..." : "Ya, Kirim Approval"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                {approvalStatus === "menunggu_approval_kaprodi" && (
+                  <>
+                    <Button
+                      size="sm"
+                      className="h-9 text-xs bg-blue-600 text-white hover:bg-blue-700 gap-1.5"
+                      disabled={kaprodiApproveMutation.isPending}
+                      onClick={() => kaprodiApproveMutation.mutate()}
+                    >
+                      {kaprodiApproveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                      Approve Kaprodi
+                    </Button>
+                    <Dialog open={isKaprodiRejectOpen} onOpenChange={setIsKaprodiRejectOpen}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 text-xs text-red-600 border-red-200 hover:bg-red-50 gap-1.5"
+                        onClick={() => setIsKaprodiRejectOpen(true)}
+                      >
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Reject
+                      </Button>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Tolak Pleno?</DialogTitle>
+                          <DialogDescription>
+                            Catatan wajib diisi agar Admin Prodi dapat memperbaiki keputusan pleno.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <Textarea
+                          value={kaprodiRejectNote}
+                          onChange={(e) => setKaprodiRejectNote(e.target.value)}
+                          placeholder="Tuliskan alasan penolakan..."
+                          className="min-h-[120px]"
+                        />
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsKaprodiRejectOpen(false)} disabled={kaprodiRejectMutation.isPending}>Batal</Button>
+                          <Button
+                            className="bg-red-600 text-white hover:bg-red-700"
+                            disabled={!kaprodiRejectNote.trim() || kaprodiRejectMutation.isPending}
+                            onClick={() => kaprodiRejectMutation.mutate()}
+                          >
+                            {kaprodiRejectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                            Tolak Pleno
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </>
+                )}
               </div>
             </div>
 
@@ -462,6 +588,7 @@ export default function DashboardPlenoPage() {
                           <div className="space-y-2 py-1">
                             <Select
                               value={keputusanFinal[mk.mata_kuliah_id] || ""}
+                              disabled={isApprovalLocked}
                               onValueChange={(val) => setKeputusanFinal(prev => ({ ...prev, [mk.mata_kuliah_id]: val }))}
                             >
                               <SelectTrigger className={`h-8 text-xs font-semibold w-[130px] mx-auto ${!keputusanFinal[mk.mata_kuliah_id] || keputusanFinal[mk.mata_kuliah_id] === "konflik"
@@ -483,6 +610,7 @@ export default function DashboardPlenoPage() {
                             </Select>
                             <Textarea
                               value={catatanPleno[mk.mata_kuliah_id] || ""}
+                              disabled={isApprovalLocked}
                               onChange={(e) => setCatatanPleno(prev => ({ ...prev, [mk.mata_kuliah_id]: e.target.value }))}
                               placeholder="Catatan pleno wajib..."
                               className={`min-h-[50px] text-[11px] resize-y w-[180px] mx-auto ${!catatanPleno[mk.mata_kuliah_id]?.trim() ? "border-red-300 dark:border-red-800" : "border-emerald-500"

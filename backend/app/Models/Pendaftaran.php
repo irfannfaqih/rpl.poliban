@@ -120,6 +120,11 @@ class Pendaftaran extends Model
         return $this->hasOne(SkKeputusan::class);
     }
 
+    public function plenoApproval()
+    {
+        return $this->hasOne(PlenoApproval::class);
+    }
+
     public function verifikasiBerkas()
     {
         return $this->hasMany(VerifikasiBerkas::class);

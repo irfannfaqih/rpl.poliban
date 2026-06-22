@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api\AdminProdi;
 
 use App\Http\Controllers\Controller;
 use App\Models\EvaluasiDiri;
-use App\Models\Notification;
 use App\Models\Pendaftaran;
 use App\Models\PemetaanMk;
+use App\Models\PlenoApproval;
 use App\Models\PlenoMk;
 use App\Models\SkKeputusan;
 use App\Models\TranskripAsal;
@@ -30,6 +30,7 @@ class PlenoController extends Controller
         $pendaftarans = Pendaftaran::with([
             "user:id,nama",
             "plenoMk.mataKuliah:id,kode,nama,sks",
+            "plenoApproval",
         ])
             ->where("prodi_id", $prodiId)
             ->whereIn("status_alur", ["pleno", "finished"])
@@ -48,6 +49,7 @@ class PlenoController extends Controller
         $pendaftarans->load([
             "user:id,nama",
             "plenoMk.mataKuliah:id,kode,nama,sks",
+            "plenoApproval",
         ]);
 
         return response()->json($pendaftarans);
@@ -71,6 +73,11 @@ class PlenoController extends Controller
             "user:id,nama",
             "plenoMk.mataKuliah:id,kode,nama,sks",
             "penugasanAsesor.asesor:id,nama",
+            "plenoApproval.submitter:id,nama",
+            "plenoApproval.kaprodiApprover:id,nama",
+            "plenoApproval.kaprodiRejecter:id,nama",
+            "plenoApproval.pimpinanApprover:id,nama",
+            "plenoApproval.pimpinanRejecter:id,nama",
         ]);
         $this->decoratePlenoSourceMetadata($pendaftaran);
 
@@ -88,10 +95,15 @@ class PlenoController extends Controller
 
         if (
             $pendaftaran->status_alur !== 'pleno' ||
-            $pendaftaran->skKeputusan?->status === 'sk_terbit'
+            $pendaftaran->skKeputusan?->status === 'sk_terbit' ||
+            in_array($pendaftaran->plenoApproval?->status, [
+                'menunggu_approval_kaprodi',
+                'menunggu_approval_pimpinan',
+                'approved_final',
+            ], true)
         ) {
             return response()->json([
-                'message' => 'Keputusan pleno sudah final dan tidak dapat diubah.',
+                'message' => 'Keputusan pleno sudah masuk proses approval atau sudah final.',
             ], 409);
         }
 
@@ -160,7 +172,7 @@ class PlenoController extends Controller
         $this->authorize('update', $pendaftaran);
 
         try {
-            $totalSksDiakui = DB::transaction(function () use ($pendaftaran) {
+            DB::transaction(function () use ($pendaftaran, $request) {
                 $locked = Pendaftaran::whereKey($pendaftaran->id)
                     ->lockForUpdate()
                     ->firstOrFail();
@@ -178,6 +190,18 @@ class PlenoController extends Controller
                     $existingSk?->status === 'sk_terbit',
                     409,
                     'SK sudah diterbitkan dan tidak dapat difinalisasi ulang.',
+                );
+                $approval = PlenoApproval::where('pendaftaran_id', $locked->id)
+                    ->lockForUpdate()
+                    ->first();
+                abort_if(
+                    in_array($approval?->status, [
+                        'menunggu_approval_kaprodi',
+                        'menunggu_approval_pimpinan',
+                        'approved_final',
+                    ], true),
+                    409,
+                    'Pleno sudah berada dalam proses approval.',
                 );
 
                 $pleno = PlenoMk::where(
@@ -197,45 +221,98 @@ class PlenoController extends Controller
                     'Seluruh mata kuliah harus memiliki keputusan final yang valid.',
                 );
 
-                $totalSksDiakui = PlenoMk::where(
-                    "pendaftaran_id",
-                    $locked->id,
-                )
-                    ->where("keputusan_final", "!=", "T")
-                    ->join(
-                        "mata_kuliah",
-                        "pleno_mk.mata_kuliah_id",
-                        "=",
-                        "mata_kuliah.id",
-                    )
-                    ->sum("mata_kuliah.sks");
-
-                SkKeputusan::updateOrCreate(
-                    ["pendaftaran_id" => $locked->id],
+                PlenoApproval::updateOrCreate(
+                    ['pendaftaran_id' => $locked->id],
                     [
-                        "total_sks_diakui" => $totalSksDiakui,
-                        "status" => "menunggu_sk",
+                        'status' => 'menunggu_approval_kaprodi',
+                        'submitted_by' => $request->user()->id,
+                        'submitted_at' => now(),
+                        'kaprodi_approved_by' => null,
+                        'kaprodi_approved_at' => null,
+                        'kaprodi_rejected_by' => null,
+                        'kaprodi_rejected_at' => null,
+                        'kaprodi_catatan' => null,
+                        'pimpinan_approved_by' => null,
+                        'pimpinan_approved_at' => null,
+                        'pimpinan_rejected_by' => null,
+                        'pimpinan_rejected_at' => null,
+                        'pimpinan_catatan' => null,
                     ],
                 );
-                $locked->update(["status_alur" => "finished"]);
-
-                return $totalSksDiakui;
             });
         } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
             throw $e;
         }
 
-        Notification::create([
-            "user_id" => $pendaftaran->user_id,
-            "title" => "Hasil Pleno Diterbitkan",
-            "message" => "Hasil sidang pleno untuk asesmen Anda telah diterbitkan dengan total {$totalSksDiakui} SKS yang diakui.",
-            "type" => "success",
-            "href" => "/pemohon/dashboard",
+        return response()->json([
+            "message" => "Pleno dikirim ke approval Kaprodi.",
+        ]);
+    }
+
+    public function kaprodiApprove(Request $request, Pendaftaran $pendaftaran): JsonResponse
+    {
+        $this->authorize('update', $pendaftaran);
+
+        DB::transaction(function () use ($pendaftaran, $request) {
+            $locked = Pendaftaran::whereKey($pendaftaran->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($locked->status_alur === 'pleno', 409, 'Pendaftaran tidak berada pada tahap pleno.');
+
+            $approval = PlenoApproval::where('pendaftaran_id', $locked->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless(
+                $approval->status === 'menunggu_approval_kaprodi',
+                409,
+                'Approval Kaprodi tidak tersedia untuk pleno ini.',
+            );
+
+            $approval->update([
+                'status' => 'menunggu_approval_pimpinan',
+                'kaprodi_approved_by' => $request->user()->id,
+                'kaprodi_approved_at' => now(),
+                'kaprodi_rejected_by' => null,
+                'kaprodi_rejected_at' => null,
+                'kaprodi_catatan' => null,
+            ]);
+        });
+
+        return response()->json(['message' => 'Pleno disetujui Kaprodi dan dikirim ke Pimpinan.']);
+    }
+
+    public function kaprodiReject(Request $request, Pendaftaran $pendaftaran): JsonResponse
+    {
+        $this->authorize('update', $pendaftaran);
+
+        $validated = $request->validate([
+            'catatan' => 'required|string|max:2000',
         ]);
 
-        return response()->json([
-            "message" => "Pleno telah difinalisasi, pendaftaran selesai.",
-        ]);
+        DB::transaction(function () use ($pendaftaran, $request, $validated) {
+            $locked = Pendaftaran::whereKey($pendaftaran->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($locked->status_alur === 'pleno', 409, 'Pendaftaran tidak berada pada tahap pleno.');
+
+            $approval = PlenoApproval::where('pendaftaran_id', $locked->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless(
+                $approval->status === 'menunggu_approval_kaprodi',
+                409,
+                'Approval Kaprodi tidak tersedia untuk pleno ini.',
+            );
+
+            $approval->update([
+                'status' => 'ditolak_kaprodi',
+                'kaprodi_rejected_by' => $request->user()->id,
+                'kaprodi_rejected_at' => now(),
+                'kaprodi_catatan' => $validated['catatan'],
+            ]);
+        });
+
+        return response()->json(['message' => 'Pleno ditolak Kaprodi dan dapat direvisi Admin Prodi.']);
     }
 
     /**

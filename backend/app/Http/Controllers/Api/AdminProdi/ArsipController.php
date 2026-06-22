@@ -130,6 +130,16 @@ class ArsipController extends Controller
             ], 410);
         }
 
+        if (
+            strtoupper((string) $kode) === 'F19' &&
+            $pendaftaran->plenoApproval?->status !== 'approved_final'
+        ) {
+            return response()->json([
+                'status' => 'locked',
+                'message' => 'Berita Acara F19 baru dapat diunduh setelah approval Kaprodi dan Pimpinan selesai.',
+            ], 423);
+        }
+
         try {
             // Generate PDF menggunakan service
             $pdf = $pdfService->generateDocumentPdf($pendaftaran, $kode);
