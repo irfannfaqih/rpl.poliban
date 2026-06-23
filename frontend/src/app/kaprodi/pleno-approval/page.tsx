@@ -2,11 +2,19 @@
 
 import api from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Eye, Loader2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, Filter, Loader2, Search, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -17,12 +25,13 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
-const FILTERS = [
-  { key: "all", label: "Semua", statuses: [] },
-  { key: "waiting", label: "Menunggu", statuses: ["menunggu_approval_kaprodi"] },
-  { key: "rejected", label: "Ditolak", statuses: ["ditolak_kaprodi"] },
-  { key: "forwarded", label: "Diteruskan", statuses: ["menunggu_approval_pimpinan"] },
-  { key: "final", label: "Final", statuses: ["approved_final"] },
+const STATUS_OPTIONS = [
+  { value: "all", label: "Semua Status" },
+  { value: "menunggu_approval_kaprodi", label: "Menunggu Kaprodi" },
+  { value: "menunggu_approval_pimpinan", label: "Menunggu Pimpinan" },
+  { value: "ditolak_kaprodi", label: "Ditolak Kaprodi" },
+  { value: "ditolak_pimpinan", label: "Ditolak Pimpinan" },
+  { value: "approved_final", label: "Disetujui Final" },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -35,7 +44,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function KaprodiPlenoApprovalPage() {
   const queryClient = useQueryClient();
-  const [activeFilter, setActiveFilter] = useState("waiting");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("menunggu_approval_kaprodi");
   const [selectedApproval, setSelectedApproval] = useState<any | null>(null);
   const [rejectNote, setRejectNote] = useState("");
 
@@ -50,10 +60,19 @@ export default function KaprodiPlenoApprovalPage() {
   });
 
   const filteredApprovals = useMemo(() => {
-    const filter = FILTERS.find((item) => item.key === activeFilter);
-    if (!filter || filter.statuses.length === 0) return approvals;
-    return approvals.filter((approval: any) => filter.statuses.includes(approval.status));
-  }, [activeFilter, approvals]);
+    const keyword = searchTerm.trim().toLowerCase();
+    return approvals.filter((approval: any) => {
+      const matchesStatus = statusFilter === "all" || approval.status === statusFilter;
+      const nama = approval.pendaftaran?.user?.nama || "";
+      const nomor = approval.pendaftaran?.nomor_pendaftaran || `RPL-${approval.pendaftaran_id}`;
+      const prodi = approval.pendaftaran?.prodi?.nama || "";
+      const matchesSearch = !keyword || [nama, nomor, prodi].some((value) =>
+        value.toLowerCase().includes(keyword),
+      );
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [approvals, searchTerm, statusFilter]);
 
   const approveMutation = useMutation({
     mutationFn: (id: number) => api.post(`/kaprodi/pleno-approvals/${id}/approve`),
@@ -106,7 +125,35 @@ export default function KaprodiPlenoApprovalPage() {
         </p>
       </div>
 
-      <StatusTabs active={activeFilter} onChange={setActiveFilter} approvals={approvals} />
+      <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Cari pemohon, nomor, atau prodi..."
+              className="h-10 bg-background pl-9"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value || "all")}>
+            <SelectTrigger className="h-10 w-full bg-background sm:w-[220px]">
+              <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+              <SelectValue placeholder="Status approval" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="text-xs font-semibold text-muted-foreground">
+          {filteredApprovals.length} dari {approvals.length} pengajuan
+        </div>
+      </div>
 
       <ApprovalTable approvals={filteredApprovals} onDetail={setSelectedApproval} />
 
@@ -122,33 +169,6 @@ export default function KaprodiPlenoApprovalPage() {
         rejectMutation={rejectMutation}
         roleLabel="Kaprodi"
       />
-    </div>
-  );
-}
-
-function StatusTabs({ active, onChange, approvals }: { active: string; onChange: (key: string) => void; approvals: any[] }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {FILTERS.map((filter) => {
-        const count = filter.statuses.length === 0
-          ? approvals.length
-          : approvals.filter((approval) => filter.statuses.includes(approval.status)).length;
-        return (
-          <button
-            key={filter.key}
-            type="button"
-            onClick={() => onChange(filter.key)}
-            className={`rounded-full border px-4 py-2 text-xs font-bold transition-colors ${
-              active === filter.key
-                ? "border-emerald-600 bg-emerald-600 text-white"
-                : "border-border bg-card text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {filter.label}
-            <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5">{count}</span>
-          </button>
-        );
-      })}
     </div>
   );
 }
