@@ -38,7 +38,7 @@ class KurikulumController extends Controller
         $validated = $request->validate([
             // Unique kode sekarang per prodi (bukan global)
             "kode" => "required|string|max:20|unique:mata_kuliah,kode,NULL,id,prodi_id,{$prodiId}",
-            "nama" => "required|string|max:255",
+            "nama" => "required|string|max:150",
             "sks" => "required|integer|min:1|max:6",
             "semester" => "nullable|integer|min:1|max:8",
             "level_kkni" => "nullable|integer|min:1|max:9",
@@ -81,7 +81,7 @@ class KurikulumController extends Controller
         }
         $validated = $request->validate([
             "kode" => "sometimes|string|max:20|unique:mata_kuliah,kode,{$mataKuliah->id}",
-            "nama" => "sometimes|string|max:255",
+            "nama" => "sometimes|string|max:150",
             "sks" => "sometimes|integer|min:1|max:6",
             "deskripsi" => "nullable|string",
         ]);

@@ -63,8 +63,8 @@ class PenggunaController extends Controller
         }
 
         $validated = $request->validate([
-            "nama" => "required|string|max:255",
-            "email" => "required|email|unique:users,email",
+            "nama" => "required|string|max:150",
+            "email" => "required|email|max:254|unique:users,email",
             "password" => "required|string|min:8",
             "nip" => [
                 "nullable",
@@ -114,8 +114,8 @@ class PenggunaController extends Controller
         }
 
         $validated = $request->validate([
-            "nama" => "sometimes|string|max:255",
-            "email" => "sometimes|email|unique:users,email,{$pengguna->id}",
+            "nama" => "sometimes|string|max:150",
+            "email" => "sometimes|email|max:254|unique:users,email,{$pengguna->id}",
             "nip" => [
                 "nullable",
                 "string",

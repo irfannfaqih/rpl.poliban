@@ -30,7 +30,7 @@ class ProdiController extends Controller
     {
         $validated = $request->validate([
             'kode' => 'required|string|max:10|unique:prodi,kode',
-            'nama' => 'required|string|max:255',
+            'nama' => 'required|string|max:150',
             'jenjang' => 'required|in:D3,D4',
             'jurusan' => 'sometimes|string|max:100',
             'jurusan_id' => 'required|exists:jurusan,id',
@@ -54,7 +54,7 @@ class ProdiController extends Controller
     {
         $validated = $request->validate([
             'kode' => "sometimes|string|max:10|unique:prodi,kode,{$prodi->id}",
-            'nama' => 'sometimes|string|max:255',
+            'nama' => 'sometimes|string|max:150',
             'jenjang' => 'sometimes|in:D3,D4',
             'jurusan' => 'sometimes|string|max:100',
             'jurusan_id' => 'sometimes|exists:jurusan,id',

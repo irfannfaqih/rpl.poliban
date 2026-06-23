@@ -28,7 +28,7 @@ class GelombangController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'nama' => 'required|string|max:255',
+            'nama' => 'required|string|max:150',
             'tgl_buka' => 'required|date',
             'tgl_tutup' => 'required|date|after:tgl_buka',
             'tgl_sanggah' => 'required|date|after:tgl_tutup',
@@ -52,7 +52,7 @@ class GelombangController extends Controller
     public function update(Request $request, Gelombang $gelombang): JsonResponse
     {
         $validated = $request->validate([
-            'nama' => 'sometimes|string|max:255',
+            'nama' => 'sometimes|string|max:150',
             'tgl_buka' => 'sometimes|date',
             'tgl_tutup' => 'sometimes|date',
             'tgl_sanggah' => 'sometimes|date',

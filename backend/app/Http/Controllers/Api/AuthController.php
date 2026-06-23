@@ -27,7 +27,7 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            "email" => "required|email",
+            "email" => "required|email|max:254",
             "password" => "required|string",
         ]);
 
@@ -87,8 +87,8 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            "nama" => "required|string|max:255",
-            "email" => "required|email|unique:users,email",
+            "nama" => "required|string|max:150",
+            "email" => "required|email|max:254|unique:users,email",
             "password" => "required|string|min:8",
             "prodi_id" => "required|integer|exists:prodi,id",
             "gelombang_id" => "required|integer|exists:gelombang,id",
@@ -229,7 +229,7 @@ class AuthController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            "nama" => "required|string|max:255",
+            "nama" => "required|string|max:150",
             "jenis_kelamin" => "nullable|string|in:Laki-Laki,Perempuan",
             "tempat_lahir" => "nullable|string|max:255",
             "tanggal_lahir" => "nullable|date",
@@ -312,7 +312,7 @@ class AuthController extends Controller
     public function forgotPassword(Request $request): JsonResponse
     {
         $request->validate([
-            "email" => "required|email",
+            "email" => "required|email|max:254",
         ]);
 
         $status = Password::sendResetLink($request->only("email"));
@@ -345,7 +345,7 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             "token" => "required|string",
-            "email" => "required|email",
+            "email" => "required|email|max:254",
             "password" => "required|string|min:8|confirmed",
         ]);
 
