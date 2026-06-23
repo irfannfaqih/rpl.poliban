@@ -20,6 +20,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import api from "@/lib/api";
+import {
+  getPlenoApprovalStatusClass,
+  getPlenoApprovalStatusLabel,
+  PLENO_APPROVAL_STATUS,
+} from "@/lib/pleno-approval-status";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -64,7 +69,11 @@ export default function DashboardPlenoPage() {
   const plenoMkList = detailData?.pleno_mk || [];
   const approval = detailData?.pleno_approval;
   const approvalStatus = approval?.status;
-  const isApprovalLocked = ["menunggu_approval_kaprodi", "menunggu_approval_pimpinan", "approved_final"].includes(approvalStatus);
+  const isApprovalLocked = [
+    PLENO_APPROVAL_STATUS.MENUNGGU_KAPRODI,
+    PLENO_APPROVAL_STATUS.MENUNGGU_PIMPINAN,
+    PLENO_APPROVAL_STATUS.APPROVED_FINAL,
+  ].includes(approvalStatus);
 
   // Sinkronisasi data awal
   useEffect(() => {
@@ -139,27 +148,11 @@ export default function DashboardPlenoPage() {
   const isAlreadyFinished = detailData?.status_alur === 'finished';
   const canSahkan = selectedPemohon && allConflictsResolved && !isAlreadyFinished && !isApprovalLocked;
 
-  const approvalLabel = (status?: string) => {
-    switch (status) {
-      case "menunggu_approval_kaprodi": return "Menunggu Approval Kaprodi";
-      case "ditolak_kaprodi": return "Ditolak Kaprodi";
-      case "menunggu_approval_pimpinan": return "Menunggu Approval Pimpinan";
-      case "ditolak_pimpinan": return "Ditolak Pimpinan";
-      case "approved_final": return "Approved Final";
-      default: return "Belum Diajukan";
-    }
-  };
+  const approvalLabel = (status?: string) => status ? getPlenoApprovalStatusLabel(status) : "Belum Diajukan";
 
-  const approvalClass = (status?: string) => {
-    switch (status) {
-      case "approved_final": return "bg-emerald-50 text-emerald-700 border-emerald-200";
-      case "ditolak_kaprodi":
-      case "ditolak_pimpinan": return "bg-red-50 text-red-700 border-red-200";
-      case "menunggu_approval_kaprodi":
-      case "menunggu_approval_pimpinan": return "bg-amber-50 text-amber-700 border-amber-200";
-      default: return "bg-slate-50 text-slate-600 border-slate-200";
-    }
-  };
+  const approvalClass = (status?: string) => status
+    ? getPlenoApprovalStatusClass(status)
+    : "bg-slate-50 text-slate-600 border-slate-200";
 
   const getStatusRowClass = (status: string) => {
     switch (status) {
@@ -309,8 +302,8 @@ export default function DashboardPlenoPage() {
           <Button
             size="sm"
             className="gap-2 h-9 text-xs bg-slate-800 text-white hover:bg-slate-900 border-transparent cursor-pointer"
-            disabled={!selectedPemohon || approvalStatus !== "approved_final"}
-            title={approvalStatus === "approved_final" ? "Unduh Berita Acara F19" : "F19 menunggu approval Kaprodi dan Pimpinan"}
+            disabled={!selectedPemohon || approvalStatus !== PLENO_APPROVAL_STATUS.APPROVED_FINAL}
+            title={approvalStatus === PLENO_APPROVAL_STATUS.APPROVED_FINAL ? "Unduh Berita Acara F19" : "F19 menunggu approval Kaprodi dan Pimpinan"}
             onClick={() => {
               const nama = detailData?.user?.nama?.replace(/\s+/g, "_") || selectedPemohon;
               handleDownloadPdf("F19", `F19_Berita_Acara_Asesmen_${nama}.pdf`);

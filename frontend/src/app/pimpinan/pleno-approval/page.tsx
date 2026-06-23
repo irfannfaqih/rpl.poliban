@@ -1,6 +1,12 @@
 "use client";
 
 import api from "@/lib/api";
+import {
+  getPlenoApprovalStatusClass,
+  getPlenoApprovalStatusLabel,
+  PLENO_APPROVAL_STATUS,
+  PLENO_APPROVAL_STATUS_OPTIONS,
+} from "@/lib/pleno-approval-status";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Eye, Filter, Loader2, Search, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -13,7 +19,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import {
   Dialog,
@@ -25,23 +30,10 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
-const STATUS_OPTIONS = [
-  { value: "all", label: "Semua Status" },
-  { value: "menunggu_approval_pimpinan", label: "Menunggu Pimpinan" },
-  { value: "ditolak_pimpinan", label: "Ditolak Pimpinan" },
-  { value: "approved_final", label: "Disetujui Final" },
-];
-
-const STATUS_LABEL: Record<string, string> = {
-  menunggu_approval_pimpinan: "Menunggu Pimpinan",
-  ditolak_pimpinan: "Ditolak Pimpinan",
-  approved_final: "Disetujui Final",
-};
-
 export default function PimpinanPlenoApprovalPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("menunggu_approval_pimpinan");
+  const [statusFilter, setStatusFilter] = useState<string>(PLENO_APPROVAL_STATUS.MENUNGGU_PIMPINAN);
   const [selectedApproval, setSelectedApproval] = useState<any | null>(null);
   const [rejectNote, setRejectNote] = useState("");
 
@@ -136,10 +128,14 @@ export default function PimpinanPlenoApprovalPage() {
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value || "all")}>
             <SelectTrigger className="h-10 w-full bg-background sm:w-[220px]">
               <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-              <SelectValue placeholder="Status approval" />
+              <span className="truncate text-left">
+                {statusFilter === "all" ? "Semua Status" : getPlenoApprovalStatusLabel(statusFilter)}
+              </span>
             </SelectTrigger>
             <SelectContent>
-              {STATUS_OPTIONS.map((option) => (
+              {PLENO_APPROVAL_STATUS_OPTIONS.filter(
+                (option) => option.value !== PLENO_APPROVAL_STATUS.MENUNGGU_KAPRODI && option.value !== PLENO_APPROVAL_STATUS.DITOLAK_KAPRODI,
+              ).map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -235,7 +231,7 @@ function ApprovalDetailDialog({
 }) {
   const pleno = approval?.pendaftaran?.pleno_mk || [];
   const accepted = pleno.filter((item: any) => item.keputusan_final && item.keputusan_final !== "T");
-  const pending = approval?.status === "menunggu_approval_pimpinan";
+  const pending = approval?.status === PLENO_APPROVAL_STATUS.MENUNGGU_PIMPINAN;
 
   return (
     <Dialog open={!!approval} onOpenChange={(open) => !open && onClose()}>
@@ -253,7 +249,7 @@ function ApprovalDetailDialog({
               <Info label="Pemohon" value={approval.pendaftaran?.user?.nama || "-"} />
               <Info label="Nomor Pendaftaran" value={approval.pendaftaran?.nomor_pendaftaran || `RPL-${approval.pendaftaran_id}`} />
               <Info label="Prodi" value={approval.pendaftaran?.prodi?.nama || "-"} />
-              <Info label="Status" value={STATUS_LABEL[approval.status] || approval.status || "-"} />
+              <Info label="Status" value={getPlenoApprovalStatusLabel(approval.status)} />
               <Info label="Disetujui Kaprodi" value={approval.kaprodi_approver?.nama || "-"} />
               <Info label="Tanggal Approval Kaprodi" value={formatDate(approval.kaprodi_approved_at)} />
             </div>
@@ -344,13 +340,11 @@ function ApprovalDetailDialog({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const className = status === "approved_final"
-    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-    : status === "ditolak_pimpinan"
-      ? "bg-red-50 text-red-700 border-red-200"
-      : "bg-amber-50 text-amber-700 border-amber-200";
-
-  return <Badge variant="outline" className={className}>{STATUS_LABEL[status] || status || "-"}</Badge>;
+  return (
+    <Badge variant="outline" className={getPlenoApprovalStatusClass(status)}>
+      {getPlenoApprovalStatusLabel(status)}
+    </Badge>
+  );
 }
 
 function Info({ label, value }: { label: string; value: string }) {

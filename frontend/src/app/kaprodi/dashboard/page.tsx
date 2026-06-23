@@ -1,6 +1,10 @@
 "use client";
 
 import api from "@/lib/api";
+import {
+  getPlenoApprovalStatusLabel,
+  PLENO_APPROVAL_STATUS,
+} from "@/lib/pleno-approval-status";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Clock3, ClipboardCheck, Loader2, XCircle } from "lucide-react";
@@ -42,10 +46,10 @@ export default function KaprodiDashboardPage() {
     );
   }
 
-  const waiting = countByStatus(approvals, ["menunggu_approval_kaprodi"]);
-  const forwarded = countByStatus(approvals, ["menunggu_approval_pimpinan"]);
-  const rejected = countByStatus(approvals, ["ditolak_kaprodi"]);
-  const finalApproved = countByStatus(approvals, ["approved_final"]);
+  const waiting = countByStatus(approvals, [PLENO_APPROVAL_STATUS.MENUNGGU_KAPRODI]);
+  const forwarded = countByStatus(approvals, [PLENO_APPROVAL_STATUS.MENUNGGU_PIMPINAN]);
+  const rejected = countByStatus(approvals, [PLENO_APPROVAL_STATUS.DITOLAK_KAPRODI]);
+  const finalApproved = countByStatus(approvals, [PLENO_APPROVAL_STATUS.APPROVED_FINAL]);
   const latest = approvals.slice(0, 5);
 
   return (
@@ -90,7 +94,7 @@ export default function KaprodiDashboardPage() {
                 <tr key={approval.id} className="hover:bg-muted/10">
                   <td className="px-5 py-4 font-semibold">{approval.pendaftaran?.user?.nama || "-"}</td>
                   <td className="px-5 py-4 text-xs text-muted-foreground">{approval.pendaftaran?.nomor_pendaftaran || `RPL-${approval.pendaftaran_id}`}</td>
-                  <td className="px-5 py-4 text-xs">{approvalStatusLabel(approval.status)}</td>
+                  <td className="px-5 py-4 text-xs">{getPlenoApprovalStatusLabel(approval.status)}</td>
                   <td className="px-5 py-4 text-xs text-muted-foreground">{formatDate(approval.submitted_at || approval.updated_at)}</td>
                 </tr>
               ))}
@@ -119,17 +123,6 @@ function SummaryCard({ title, value, icon: Icon, className }: { title: string; v
       <p className="mt-4 text-3xl font-black">{value}</p>
     </div>
   );
-}
-
-function approvalStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    menunggu_approval_kaprodi: "Menunggu Kaprodi",
-    menunggu_approval_pimpinan: "Menunggu Pimpinan",
-    ditolak_kaprodi: "Ditolak Kaprodi",
-    ditolak_pimpinan: "Ditolak Pimpinan",
-    approved_final: "Disetujui Final",
-  };
-  return labels[status] || status || "-";
 }
 
 function formatDate(value?: string | null) {
