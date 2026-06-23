@@ -47,7 +47,7 @@ interface AuthState {
 const ROLE_DASHBOARD_MAP: Record<string, string> = {
   pemohon: "/pemohon/dashboard",
   admin_prodi: "/admin-prodi/dashboard",
-  kaprodi: "/kaprodi/pleno-approval",
+  kaprodi: "/kaprodi/dashboard",
   asesor: "/asesor/dashboard",
   pimpinan: "/pimpinan/dashboard",
   super_admin: "/super-admin/gelombang",
