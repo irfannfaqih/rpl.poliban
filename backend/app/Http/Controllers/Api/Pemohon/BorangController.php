@@ -210,7 +210,7 @@ class BorangController extends Controller
         $this->authorize('update', $pendaftaran);
 
         $validated = $request->validate([
-            "nama_lengkap" => "required|string|max:255",
+            "nama_lengkap" => "required|string|max:150",
             "nik" => "required|string|size:16",
             "tempat_lahir" => "required|string|max:100",
             "tanggal_lahir" => "required|date",
@@ -222,7 +222,7 @@ class BorangController extends Controller
             "no_telp_rumah" => "nullable|string|max:20",
             "alamat" => "required|string",
             "kode_pos" => "nullable|string|size:5",
-            "email_pribadi" => "required|email",
+            "email_pribadi" => "required|email|max:254",
         ]);
 
         $dataDiri = BorangDataDiri::updateOrCreate(
@@ -252,8 +252,8 @@ class BorangController extends Controller
         $validated = $request->validate([
             "items" => "required|array",
             "items.*.jenjang" => "required|string|max:50",
-            "items.*.institusi" => "required|string|max:255",
-            "items.*.program_studi" => "nullable|string|max:255",
+            "items.*.institusi" => "required|string|max:150",
+            "items.*.program_studi" => "nullable|string|max:150",
             "items.*.tahun_masuk" => "required|integer|min:1900|max:{$currentYear}",
             "items.*.tahun_lulus" => "required|integer|min:1900|max:{$currentYear}",
             "items.*.ipk" => "required|numeric|min:0|max:4",

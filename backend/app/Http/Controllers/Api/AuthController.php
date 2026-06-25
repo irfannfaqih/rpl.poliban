@@ -230,18 +230,18 @@ class AuthController extends Controller
 
         $validated = $request->validate([
             "nama" => "required|string|max:150",
-            "jenis_kelamin" => "nullable|string|in:Laki-Laki,Perempuan",
-            "tempat_lahir" => "nullable|string|max:255",
+            "jenis_kelamin" => "nullable|string|in:Laki-Laki,Perempuan|max:16",
+            "tempat_lahir" => "nullable|string|max:100",
             "tanggal_lahir" => "nullable|date",
             "phone" => "nullable|string|max:20",
             "alamat" => "nullable|string",
             "jabatan" => "nullable|string|max:255",
             "nip" => "nullable|string|max:255",
-            "bidang_keilmuan" => "nullable|string|max:255",
-            "pendidikan_terakhir" => "nullable|string|max:255",
-            "instansi" => "nullable|string|max:255",
-            "jabatan_instansi" => "nullable|string|max:255",
-            "asosiasi_profesi" => "nullable|string|max:255",
+            "bidang_keilmuan" => "nullable|string|max:150",
+            "pendidikan_terakhir" => "nullable|string|max:150",
+            "instansi" => "nullable|string|max:150",
+            "jabatan_instansi" => "nullable|string|max:100",
+            "asosiasi_profesi" => "nullable|string|max:150",
         ]);
 
         $user->update($validated);
