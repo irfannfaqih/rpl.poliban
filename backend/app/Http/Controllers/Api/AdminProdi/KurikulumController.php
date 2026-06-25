@@ -47,7 +47,7 @@ class KurikulumController extends Controller
             "cp_pengetahuan" => "nullable|string",
             "cp_keterampilan" => "nullable|string",
             "indikator_kinerja" => "nullable|string",
-            "profil_lulusan" => "nullable|string",
+            "profil_lulusan" => "nullable|string|max:150",
         ]);
 
         $validated["prodi_id"] = $prodiId;

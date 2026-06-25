@@ -346,8 +346,8 @@ class BorangController extends Controller
             "items" => "nullable|array",
             "items.*.tipe" =>
                 "required|in:kerja,pelatihan,organisasi,penghargaan",
-            "items.*.nama" => "required|string|max:255",
-            "items.*.jabatan_peran" => "nullable|string|max:255",
+            "items.*.nama" => "required|string|max:150",
+            "items.*.jabatan_peran" => "nullable|string|max:100",
             "items.*.status_kepegawaian" =>
                 "nullable|in:tetap,kontrak,freelance,magang",
             "items.*.bidang" => "nullable|string|max:100",
@@ -528,7 +528,7 @@ class BorangController extends Controller
             "file" => "required|file|mimes:pdf,jpg,jpeg,png|max:10240",
             "tipe" =>
                 "required|in:ktp,ijazah,transkrip,sertifikat,portofolio_p01,portofolio_p02,portofolio_p03,portofolio_p04,portofolio_p05,portofolio_p06,portofolio_p07,portofolio_p08,portofolio_p09,portofolio_p10,portofolio,tambahan",
-            "deskripsi" => "nullable|string|max:255",
+            "deskripsi" => "nullable|string|max:150",
         ], [
             "file.mimes" => "Dokumen yang diunggah harus berekstensi .pdf, .jpg, .jpeg, atau .png"
         ]);

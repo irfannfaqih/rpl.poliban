@@ -30,7 +30,7 @@ class UjiLanjutanController extends Controller
             "tanggal_ujian" => "required|date|after_or_equal:today",
             "waktu_ujian"   => ["required", "string", "max:10", "regex:/^\d{1,2}:\d{2}$/"],
             "durasi_menit"  => "required|integer|min:1|max:480",
-            "tempat"        => "nullable|string|max:500",
+            "tempat"        => "nullable|string|max:150",
             "link_meeting"  => "nullable|string|max:2000",
         ]);
 
@@ -131,7 +131,7 @@ class UjiLanjutanController extends Controller
             "tanggal_ujian" => "required|date|after_or_equal:today",
             "waktu_ujian"   => ["required", "string", "max:10", "regex:/^\d{1,2}:\d{2}$/"],
             "durasi_menit"  => "required|integer|min:1|max:480",
-            "tempat"        => "nullable|string|max:500",
+            "tempat"        => "nullable|string|max:150",
             "link_meeting"  => "nullable|string|max:2000",
         ]);
 

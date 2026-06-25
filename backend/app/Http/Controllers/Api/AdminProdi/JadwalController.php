@@ -38,7 +38,7 @@ class JadwalController extends Controller
             'pendaftaran_id' => 'required|exists:pendaftaran,id',
             'tanggal' => 'required|date',
             'waktu' => 'required|string|max:50',
-            'tempat' => 'required|string|max:500',
+            'tempat' => 'required|string|max:150',
             'link_meeting' => 'nullable|string|max:2000',
             'catatan' => 'nullable|string',
         ]);
@@ -221,7 +221,7 @@ class JadwalController extends Controller
         $validated = $request->validate([
             'tanggal' => 'sometimes|date',
             'waktu' => 'sometimes|string|max:50',
-            'tempat' => 'sometimes|string|max:500',
+            'tempat' => 'sometimes|string|max:150',
             'link_meeting' => 'nullable|string|max:2000',
             'catatan' => 'nullable|string',
         ]);
