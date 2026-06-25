@@ -22,3 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Compiled Blade view cache (Laravel runtime)
+/storage/framework/views/*.php
