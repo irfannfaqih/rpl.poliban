@@ -11,11 +11,13 @@ use App\Http\Controllers\Api\Asesor\TugasController as AsesorTugasController;
 use App\Http\Controllers\Api\Asesor\UjiLanjutanController as AsesorUjiLanjutanController;
 use App\Http\Controllers\Api\Asesor\WorkspaceController as AsesorWorkspaceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Kaprodi\PlenoApprovalController as KaprodiPlenoApprovalController;
+use App\Http\Controllers\Api\Payment\MidtransNotificationController;
 use App\Http\Controllers\Api\Pemohon\BorangController;
+use App\Http\Controllers\Api\Pemohon\PaymentController;
 use App\Http\Controllers\Api\Pemohon\PembayaranController;
 use App\Http\Controllers\Api\Pemohon\PemohonExtraController;
 use App\Http\Controllers\Api\Pemohon\UjiLanjutanController as PemohonUjiLanjutanController;
-use App\Http\Controllers\Api\Kaprodi\PlenoApprovalController as KaprodiPlenoApprovalController;
 use App\Http\Controllers\Api\Pimpinan\PimpinanController as PimpinanCtrl;
 use App\Http\Controllers\Api\PrivateFileController;
 use App\Http\Controllers\Api\PublicController;
@@ -46,8 +48,14 @@ Route::get('/public/verify-sk/{id}', [
     'verifySk',
 ]);
 
+Route::post('/payment/midtrans/notification', [
+    MidtransNotificationController::class,
+    'store',
+]);
+
 // ═══ Authenticated Routes ═══
 use App\Http\Controllers\Api\Pemohon\NotificationController;
+use App\Http\Controllers\Api\SuperAdmin\JurusanController;
 
 Route::middleware('auth:sanctum')->group(function () {
     // Endpoint yang butuh autentikasi (untuk semua role)
@@ -82,7 +90,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 'toggleStatus',
             ]);
 
-            Route::apiResource('jurusan', \App\Http\Controllers\Api\SuperAdmin\JurusanController::class);
+            Route::apiResource('jurusan', JurusanController::class);
 
             Route::apiResource('pengguna', PenggunaController::class);
             Route::patch('pengguna/{pengguna}/reset-password', [
@@ -342,6 +350,18 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('pendaftaran/{pendaftaran}/bayar', [
                 PembayaranController::class,
                 'submitBayar',
+            ]);
+            Route::get('pendaftaran/{pendaftaran}/payment', [
+                PaymentController::class,
+                'show',
+            ]);
+            Route::post('pendaftaran/{pendaftaran}/payment/create', [
+                PaymentController::class,
+                'create',
+            ]);
+            Route::get('pendaftaran/{pendaftaran}/payment/status', [
+                PaymentController::class,
+                'status',
             ]);
 
             // Extra

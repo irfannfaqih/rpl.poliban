@@ -6,23 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class Pendaftaran extends Model
 {
-    protected $table = "pendaftaran";
+    protected $table = 'pendaftaran';
 
     protected $fillable = [
-        "user_id",
-        "gelombang_id",
-        "prodi_id",
-        "nomor_pendaftaran",
-        "status_alur",
-        "midtrans_order_id",
-        "midtrans_status",
-        "catatan_admin",
-        "pra_pemetaan_payload",
+        'user_id',
+        'gelombang_id',
+        'prodi_id',
+        'nomor_pendaftaran',
+        'status_alur',
+        'midtrans_order_id',
+        'midtrans_status',
+        'catatan_admin',
+        'pra_pemetaan_payload',
     ];
 
     protected function casts(): array
     {
-        return ["pra_pemetaan_payload" => "array"];
+        return ['pra_pemetaan_payload' => 'array'];
     }
 
     public function canTransitionTo(string $nextStatus): bool
@@ -125,6 +125,16 @@ class Pendaftaran extends Model
         return $this->hasOne(PlenoApproval::class);
     }
 
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function latestPayment()
+    {
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
     public function verifikasiBerkas()
     {
         return $this->hasMany(VerifikasiBerkas::class);
@@ -137,7 +147,7 @@ class Pendaftaran extends Model
 
     public function arsip_dokumen()
     {
-        return $this->hasMany(ArsipDokumen::class, "pendaftaran_id");
+        return $this->hasMany(ArsipDokumen::class, 'pendaftaran_id');
     }
 
     public function bandingEksternal()
