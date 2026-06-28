@@ -10,12 +10,30 @@ export const WORKFLOW_STORAGE_KEYS = [
   "asesor-storage",
 ];
 
+const SESSION_STORAGE_KEYS = [
+  AUTH_TOKEN_KEY,
+  AUTH_STORAGE_KEY,
+  ...WORKFLOW_STORAGE_KEYS,
+];
+
+const removeFromBrowserStorage = (key: string) => {
+  localStorage.removeItem(key);
+  sessionStorage.removeItem(key);
+};
+
 export const clearWorkflowStorage = () => {
   if (typeof window === "undefined") return;
 
   WORKFLOW_STORAGE_KEYS.forEach((key) => {
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
+    removeFromBrowserStorage(key);
+  });
+};
+
+export const clearBrowserSessionStorage = () => {
+  if (typeof window === "undefined") return;
+
+  SESSION_STORAGE_KEYS.forEach((key) => {
+    removeFromBrowserStorage(key);
   });
 };
 

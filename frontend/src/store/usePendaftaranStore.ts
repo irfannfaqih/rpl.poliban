@@ -52,7 +52,13 @@ export const usePendaftaranStore = create<PendaftaranState>()(
         }),
       setPendaftaranId: (id) => set({ pendaftaranId: id }),
       setProfile: (nama, email, prodiId) => set({ nama, email, prodiId }),
-      clearPendaftaran: () => set({ pendaftaranId: null, prodiId: null, nama: "", email: "" }),
+      clearPendaftaran: () => set({
+        ownerUserId: null,
+        pendaftaranId: null,
+        prodiId: null,
+        nama: "",
+        email: "",
+      }),
     }),
     {
       name: "pendaftaran-storage",

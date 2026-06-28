@@ -4,6 +4,7 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   ArrowRightLeft,
@@ -81,11 +82,13 @@ const sidebarLinks = [
 function AdminProdiSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
   const handleLogout = async () => {
     await logout();
+    queryClient.clear();
     router.push("/auth/login");
   };
 

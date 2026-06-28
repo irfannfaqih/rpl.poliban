@@ -2,6 +2,7 @@
 
 import { Label } from "@/components/ui/label";
 import api from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useBorangStore } from "@/store/useBorangStore";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, BookOpen, ChevronDown, ChevronUp, FileCheck, Loader2, Search } from "lucide-react";
@@ -61,6 +62,7 @@ const PROFISIENSI_OPTIONS = [
 ];
 
 export default function SectionD() {
+  const userId = useAuthStore((s) => s.user?.id);
   const data = useBorangStore((s) => s.data.sectionD);
   const updateSection = useBorangStore((s) => s.updateSection);
   const sectionEData = useBorangStore((s) => s.data.sectionE);
@@ -70,11 +72,12 @@ export default function SectionD() {
 
   // Fetch kurikulum from API instead of hardcoded data
   const { data: kurikulum = [], isLoading: kurikulumLoading } = useQuery<MataKuliahItem[]>({
-    queryKey: ["pemohon", "kurikulum"],
+    queryKey: ["pemohon", userId, "kurikulum"],
     queryFn: async () => {
       const { data: res } = await api.get("/pemohon/kurikulum");
       return res.data;
     },
+    enabled: Boolean(userId),
     staleTime: 5 * 60 * 1000,
   });
 

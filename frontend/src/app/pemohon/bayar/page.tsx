@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import api from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import { motion } from "framer-motion";
@@ -154,29 +155,40 @@ function loadSnapScript(clientKey: string) {
 export default function BayarPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
   const [mounted, setMounted] = useState(false);
   const [creatingPayment, setCreatingPayment] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const { data: pendaftaran, isLoading: loadingPendaftaran } = useQuery({
-    queryKey: ["pendaftaran", "summary"],
+    queryKey: ["pemohon", userId, "pendaftaran", "summary"],
     queryFn: async () => {
       const { data: res } = await api.get<ApiEnvelope<PendaftaranSummary>>(
         "/pemohon/pendaftaran?view=summary",
       );
       return res.data;
     },
+    enabled: Boolean(userId),
   });
 
   const { data: me } = useQuery({
-    queryKey: ["me"],
+    queryKey: ["pemohon", userId, "me"],
     queryFn: async () => {
       const { data: res } = await api.get<MeEnvelope>("/me");
       return res.user ?? null;
     },
+    enabled: Boolean(userId),
   });
 
   const pendaftaranId = pendaftaran?.id;
+  const summaryQueryKey = ["pemohon", userId, "pendaftaran", "summary"] as const;
+  const paymentQueryKey = [
+    "pemohon",
+    userId,
+    "pendaftaran",
+    pendaftaranId,
+    "payment",
+  ] as const;
   const namaLengkap = pendaftaran?.data_diri?.nama_lengkap || me?.nama || "";
 
   const {
@@ -184,8 +196,8 @@ export default function BayarPage() {
     isLoading: loadingPayment,
     refetch: refetchPaymentInfo,
   } = useQuery({
-    queryKey: ["pendaftaran", pendaftaranId, "payment"],
-    enabled: Boolean(pendaftaranId),
+    queryKey: paymentQueryKey,
+    enabled: Boolean(userId && pendaftaranId),
     queryFn: async () => {
       const { data: res } = await api.get<ApiEnvelope<PaymentInfo>>(
         `/pemohon/pendaftaran/${pendaftaranId}/payment`,
@@ -206,7 +218,7 @@ export default function BayarPage() {
     paymentStatus === "settlement" ||
     paymentStatus === "capture";
   const canPay = statusAlur === "waiting_payment" && !isPaidOrVerified;
-  const loadingInitial = !mounted || loadingPendaftaran || loadingPayment;
+  const loadingInitial = !mounted || !userId || loadingPendaftaran || loadingPayment;
 
   const statusLabel = useMemo(() => {
     if (isPaidOrVerified) return "Pembayaran sudah diverifikasi";
@@ -220,14 +232,14 @@ export default function BayarPage() {
   }, []);
 
   const refreshPaymentStatus = async () => {
-    if (!pendaftaranId) return;
+    if (!userId || !pendaftaranId) return;
 
     const { data: res } = await api.get<ApiEnvelope<PaymentStatusInfo>>(
       `/pemohon/pendaftaran/${pendaftaranId}/payment/status`,
     );
 
     queryClient.setQueryData(
-      ["pendaftaran", pendaftaranId, "payment"],
+      paymentQueryKey,
       (current: PaymentInfo | undefined) => ({
         pendaftaran_id: res.data.pendaftaran_id,
         status_alur: res.data.status_alur,
@@ -237,7 +249,7 @@ export default function BayarPage() {
         payment: res.data.payment,
       }),
     );
-    queryClient.invalidateQueries({ queryKey: ["pendaftaran", "summary"] });
+    queryClient.invalidateQueries({ queryKey: summaryQueryKey });
   };
 
   const handleSnapCallback = async (nextMessage: string) => {
@@ -252,7 +264,7 @@ export default function BayarPage() {
   };
 
   const handlePay = async () => {
-    if (!pendaftaranId) {
+    if (!userId || !pendaftaranId) {
       toast.error("Pendaftaran tidak ditemukan.");
       return;
     }
@@ -279,7 +291,7 @@ export default function BayarPage() {
       const snapToken = res.data.payment?.snap_token;
 
       queryClient.setQueryData(
-        ["pendaftaran", pendaftaranId, "payment"],
+        paymentQueryKey,
         res.data,
       );
 

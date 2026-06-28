@@ -20,14 +20,16 @@ export interface NotificationData {
   prev_page_url?: string | null;
 }
 
-export const notificationQueryKey = ["notifications"] as const;
+export const notificationQueryKey = (userId?: number | null) =>
+  ["notifications", userId] as const;
 
-export const notificationQueryOptions = queryOptions({
-  queryKey: notificationQueryKey,
+export const notificationQueryOptions = (userId?: number | null) => queryOptions({
+  queryKey: notificationQueryKey(userId),
   queryFn: async (): Promise<NotificationData> => {
     const response = await api.get("/notifikasi?per_page=10");
     return response.data;
   },
+  enabled: Boolean(userId),
   refetchInterval: 60_000,
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: true,

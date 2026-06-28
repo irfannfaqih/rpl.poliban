@@ -4,7 +4,7 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { NotificationBell } from "@/components/NotificationBell";
 import { FOCUSED_STATUSES, getRedirectPath } from "@/lib/alur";
 import api from "@/lib/api";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -24,12 +24,15 @@ export default function PemohonLayout({
 
 // Konten layout yang sesungguhnya — hanya dirender setelah AuthGuard OK
 function PemohonLayoutInner({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore((state) => state.user);
+  const userId = user?.id;
   const { data: pendaftaran, isLoading } = useQuery({
-    queryKey: ["pendaftaran", "summary"],
+    queryKey: ["pemohon", userId, "pendaftaran", "summary"],
     queryFn: async () => {
       const { data: res } = await api.get("/pemohon/pendaftaran?view=summary");
       return res.data;
     },
+    enabled: Boolean(userId),
   });
 
   const statusAlur = pendaftaran?.status_alur || "pre_submit";
@@ -113,6 +116,7 @@ function PemohonSidebar() {
   const pathname = usePathname();
   // Query unread count — polling setiap 30 detik
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const namaLengkap = user?.nama || "";
@@ -120,6 +124,7 @@ function PemohonSidebar() {
 
   const handleLogout = async () => {
     await logout();
+    queryClient.clear();
     router.push("/auth/login");
   };
 

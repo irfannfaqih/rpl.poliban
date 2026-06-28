@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -96,6 +96,9 @@ const initialBorangData: BorangData = {
   }
 };
 
+const freshBorangData = (): BorangData =>
+  JSON.parse(JSON.stringify(initialBorangData)) as BorangData;
+
 /* ------------------------------------------------------------------ */
 /*  Store                                                              */
 /* ------------------------------------------------------------------ */
@@ -105,7 +108,7 @@ export const useBorangStore = create<BorangState>()(
     (set, get) => ({
       ownerUserId: null,
       ownerPendaftaranId: null,
-      data: initialBorangData,
+      data: freshBorangData(),
       activeSection: 'sectionA',
       lastSaved: null,
       touchedSections: ['sectionA'],
@@ -122,7 +125,7 @@ export const useBorangStore = create<BorangState>()(
         set({
           ownerUserId: userId,
           ownerPendaftaranId: pendaftaranId,
-          data: initialBorangData,
+          data: freshBorangData(),
           activeSection: 'sectionA',
           lastSaved: null,
           touchedSections: ['sectionA'],
@@ -150,7 +153,14 @@ export const useBorangStore = create<BorangState>()(
         }
       },
 
-      resetBorang: () => set({ data: initialBorangData, lastSaved: null, touchedSections: ['sectionA'] }),
+      resetBorang: () => set({
+        ownerUserId: null,
+        ownerPendaftaranId: null,
+        data: freshBorangData(),
+        activeSection: 'sectionA',
+        lastSaved: null,
+        touchedSections: ['sectionA'],
+      }),
 
       /* ------------------------------------------------------------ */
       /*  Helper: get flat list of all uploaded documents               */
@@ -263,6 +273,7 @@ export const useBorangStore = create<BorangState>()(
     }),
     {
       name: 'borang-storage',
+      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );

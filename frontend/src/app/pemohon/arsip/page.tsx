@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import api from "@/lib/api";
 import { openPrivateFile, privateDocumentPath } from "@/lib/private-files";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -25,14 +26,16 @@ import {
 import { useMemo, useState } from "react";
 
 export default function ArsipPage() {
+  const userId = useAuthStore((state) => state.user?.id);
   const [openSection, setOpenSection] = useState<string>("sectionA");
 
   const { data: pendaftaran, isLoading } = useQuery({
-    queryKey: ['pendaftaran-arsip'],
+    queryKey: ["pemohon", userId, "pendaftaran", "arsip"],
     queryFn: async () => {
       const { data: res } = await api.get('/pemohon/pendaftaran?view=archive');
       return res.data;
-    }
+    },
+    enabled: Boolean(userId),
   });
 
   const toggle = (section: string) => {

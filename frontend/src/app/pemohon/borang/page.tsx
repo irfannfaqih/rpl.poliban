@@ -39,7 +39,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 /* ------------------------------------------------------------------ */
 /*  Section config                                                     */
@@ -54,6 +54,7 @@ const sections = [
 
 export default function BorangPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const {
     activeSection,
     setActiveSection,
@@ -67,18 +68,23 @@ export default function BorangPage() {
   })));
 
   const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+  const userId = user?.id;
   const prodiId = usePendaftaranStore((state) => state.prodiId);
   const setBorangOwnerContext = useBorangStore((state) => state.setOwnerContext);
+  const borangOwnerUserId = useBorangStore((state) => state.ownerUserId);
+  const borangOwnerPendaftaranId = useBorangStore((state) => state.ownerPendaftaranId);
   const setPendaftaranOwnerContext = usePendaftaranStore((state) => state.setOwnerContext);
   const setPendaftaranId = usePendaftaranStore((state) => state.setPendaftaranId);
   const setProfile = usePendaftaranStore((state) => state.setProfile);
 
   const { data: pendaftaran, isLoading, refetch } = useQuery({
-    queryKey: ['pendaftaran', 'summary'],
+    queryKey: ["pemohon", userId, "pendaftaran", "summary"],
     queryFn: async () => {
       const { data: res } = await api.get('/pemohon/pendaftaran?view=summary');
       return res.data;
-    }
+    },
+    enabled: Boolean(userId),
   });
 
   const statusAlur = pendaftaran?.status_alur || 'pre_submit';
@@ -99,16 +105,17 @@ export default function BorangPage() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
-    setPendaftaranOwnerContext(user.id);
+    setPendaftaranOwnerContext(userId);
     if (pendaftaran?.id) {
-      setBorangOwnerContext(user.id, pendaftaran.id);
+      setBorangOwnerContext(userId, pendaftaran.id);
       setPendaftaranId(pendaftaran.id);
       setProfile(user.nama, user.email, pendaftaran.prodi_id ? String(pendaftaran.prodi_id) : null);
     }
   }, [
     user,
+    userId,
     pendaftaran?.id,
     pendaftaran?.prodi_id,
     setBorangOwnerContext,
@@ -124,8 +131,16 @@ export default function BorangPage() {
     }
   }, [mounted, isLoading, isAllowedStatus, statusAlur, router]);
 
-  const handleLogout = () => {
-    // Simulate logout - in real app would clear tokens
+  const ownerContextConfirmed = Boolean(
+    userId &&
+    pendaftaran?.id &&
+    borangOwnerUserId === userId &&
+    borangOwnerPendaftaranId === pendaftaran.id,
+  );
+
+  const handleLogout = async () => {
+    await logout();
+    queryClient.clear();
     router.push("/auth/login");
   };
 
@@ -345,7 +360,7 @@ export default function BorangPage() {
 
   // If not mounted or not allowed, render a simple loader while redirecting
   // to avoid rendering the heavy BorangPage components and sidebars incorrectly.
-  if (!mounted || !isAllowedStatus || !isFocusedMode) {
+  if (!mounted || isLoading || !isAllowedStatus || !isFocusedMode || !ownerContextConfirmed) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">

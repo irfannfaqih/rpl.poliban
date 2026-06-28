@@ -2,10 +2,14 @@ import api from "@/lib/api";
 import {
   AUTH_STORAGE_KEY,
   AUTH_TOKEN_KEY,
+  clearBrowserSessionStorage,
   clearWorkflowStorage,
 } from "@/lib/auth-session";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { useAsesorStore } from "./useAsesorStore";
+import { useBorangStore } from "./useBorangStore";
+import { usePendaftaranStore } from "./usePendaftaranStore";
 
 interface Prodi {
   id: number;
@@ -55,6 +59,22 @@ const ROLE_DASHBOARD_MAP: Record<string, string> = {
 
 export { clearWorkflowStorage };
 
+export const resetWorkflowStores = () => {
+  useBorangStore.getState().resetBorang();
+  usePendaftaranStore.getState().clearPendaftaran();
+  useAsesorStore.getState().resetAsesorStore();
+};
+
+const clearApiAuthorizationHeader = () => {
+  delete api.defaults.headers.common.Authorization;
+};
+
+const clearSessionState = () => {
+  clearBrowserSessionStorage();
+  clearApiAuthorizationHeader();
+  resetWorkflowStores();
+};
+
 export const getRoleDashboard = (user: User | null): string => {
   if (!user) return "/auth/login";
   if (user.role === "pemohon" && user.status_alur) {
@@ -79,16 +99,18 @@ export const useAuthStore = create<AuthState>()(
           const { token, user } = data;
 
           // Clear previous user's persisted stores
-          clearWorkflowStorage();
+          clearSessionState();
 
           // Store token separately for API interceptor
           localStorage.setItem(AUTH_TOKEN_KEY, token);
+          api.defaults.headers.common.Authorization = `Bearer ${token}`;
 
           set({
             user,
             token,
             isAuthenticated: true,
             isLoading: false,
+            isImpersonating: false,
           });
         } catch (error) {
           set({ isLoading: false });
@@ -102,9 +124,14 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // Ignore error, clear auth anyway
         }
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        clearWorkflowStorage();
-        set({ user: null, token: null, isAuthenticated: false });
+        clearSessionState();
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+          isImpersonating: false,
+        });
       },
 
       fetchMe: async () => {
@@ -123,9 +150,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearAuth: () => {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        clearWorkflowStorage();
-        set({ user: null, token: null, isAuthenticated: false });
+        clearSessionState();
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+          isImpersonating: false,
+        });
       },
       clearImpersonate: () => {
         set({ isImpersonating: false });

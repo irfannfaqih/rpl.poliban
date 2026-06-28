@@ -8,7 +8,8 @@ import {
   clearWorkflowStorage,
   markCrossTabSessionChanged,
 } from "@/lib/auth-session";
-import { getRoleDashboard, useAuthStore } from "@/store/useAuthStore";
+import { getRoleDashboard, resetWorkflowStores, useAuthStore } from "@/store/useAuthStore";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -33,6 +34,7 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const fetchMe = useAuthStore((state) => state.fetchMe);
+  const queryClient = useQueryClient();
   const router = useRouter();
   // isVerifying: true selama re-validasi token ke server berlangsung
   const [isVerifying, setIsVerifying] = useState(true);
@@ -59,6 +61,8 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
       }
 
       clearWorkflowStorage();
+      resetWorkflowStores();
+      queryClient.clear();
       markCrossTabSessionChanged();
 
       if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -71,7 +75,7 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
 
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     async function verify() {

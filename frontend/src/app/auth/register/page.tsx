@@ -8,11 +8,11 @@ import { Eye, EyeOff, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { AUTH_TOKEN_KEY, clearWorkflowStorage } from "@/lib/auth-session";
+import { AUTH_TOKEN_KEY, clearBrowserSessionStorage } from "@/lib/auth-session";
 import { toast } from "sonner";
-import { useAuthStore } from "@/store/useAuthStore";
+import { resetWorkflowStores, useAuthStore } from "@/store/useAuthStore";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -25,6 +25,7 @@ const fadeUp = {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [nama, setNama] = useState("");
   const [email, setEmail] = useState("");
@@ -79,9 +80,11 @@ export default function RegisterPage() {
         prodi_id: Number(prodiId),
         gelombang_id: Number(gelombangId)
       });
-      
+
       // 2. Set Token automatically (auto login)
-      clearWorkflowStorage(); // Clear old workflow state without emitting a logout event first
+      queryClient.clear();
+      clearBrowserSessionStorage(); // Clear old session state without emitting a logout event first
+      resetWorkflowStores();
       localStorage.setItem(AUTH_TOKEN_KEY, regRes.token);
       api.defaults.headers.common["Authorization"] = `Bearer ${regRes.token}`;
       useAuthStore.setState({
@@ -89,6 +92,7 @@ export default function RegisterPage() {
         user: regRes.user,
         isAuthenticated: true,
       });
+      queryClient.clear();
 
       toast.success("Registrasi berhasil!");
       router.push("/pemohon/bayar");

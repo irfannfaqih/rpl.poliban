@@ -17,26 +17,31 @@ import {
 import Link from "next/link";
 
 import api from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export default function JadwalPage() {
+  const userId = useAuthStore((state) => state.user?.id);
+
   const { data: pendaftaran } = useQuery({
-    queryKey: ['pendaftaran', 'schedule'],
+    queryKey: ["pemohon", userId, "pendaftaran", "schedule"],
     queryFn: async () => {
       const { data: res } = await api.get('/pemohon/pendaftaran?view=schedule');
       return res.data;
-    }
+    },
+    enabled: Boolean(userId),
   });
 
   const statusAlur = pendaftaran?.status_alur || 'pre_submit';
 
   const { data: listJadwal = [], isLoading } = useQuery({
-    queryKey: ['jadwal-pemohon'],
+    queryKey: ["pemohon", userId, "jadwal"],
     queryFn: async () => {
       const { data: res } = await api.get('/pemohon/jadwal');
       return res.data || [];
-    }
+    },
+    enabled: Boolean(userId),
   });
 
   const jadwal = listJadwal[0]; // Ambil jadwal terbaru

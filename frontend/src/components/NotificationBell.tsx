@@ -2,10 +2,12 @@
 
 import api from "@/lib/api";
 import {
+    NotificationData,
     NotificationItem,
     notificationQueryKey,
     notificationQueryOptions,
 } from "@/hooks/useNotifications";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Bell,
@@ -41,8 +43,10 @@ function typeColor(type: string) {
 export function NotificationBell() {
     const router = useRouter();
     const queryClient = useQueryClient();
+    const userId = useAuthStore((state) => state.user?.id);
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
+    const queryKey = notificationQueryKey(userId);
 
     // Tutup dropdown saat klik di luar
     useEffect(() => {
@@ -56,7 +60,7 @@ export function NotificationBell() {
     }, []);
 
     const { data, isLoading } = useQuery({
-        ...notificationQueryOptions,
+        ...notificationQueryOptions(userId),
     });
 
     const notifs: NotificationItem[] = data?.data || [];
@@ -65,40 +69,40 @@ export function NotificationBell() {
     const markReadMutation = useMutation({
         mutationFn: (id: number) => api.patch(`/notifikasi/${id}/read`),
         onMutate: async (id) => {
-            await queryClient.cancelQueries({ queryKey: notificationQueryKey });
-            const previousData = queryClient.getQueryData(notificationQueryKey);
-            queryClient.setQueryData(notificationQueryKey, (old: any) => {
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<NotificationData>(queryKey);
+            queryClient.setQueryData<NotificationData>(queryKey, (old) => {
                 if (!old) return old;
                 return {
                     ...old,
                     unread_count: Math.max(0, old.unread_count - 1),
-                    data: (old.data || []).map((n: any) => n.id === id ? { ...n, is_read: true } : n)
+                    data: (old.data || []).map((n: NotificationItem) => n.id === id ? { ...n, is_read: true } : n)
                 };
             });
             return { previousData };
         },
         onError: (err, id, context) => {
-            queryClient.setQueryData(notificationQueryKey, context?.previousData);
+            queryClient.setQueryData(queryKey, context?.previousData);
         },
     });
 
     const markAllReadMutation = useMutation({
         mutationFn: () => api.patch("/notifikasi/read-all"),
         onMutate: async () => {
-            await queryClient.cancelQueries({ queryKey: notificationQueryKey });
-            const previousData = queryClient.getQueryData(notificationQueryKey);
-            queryClient.setQueryData(notificationQueryKey, (old: any) => {
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<NotificationData>(queryKey);
+            queryClient.setQueryData<NotificationData>(queryKey, (old) => {
                 if (!old) return old;
                 return {
                     ...old,
                     unread_count: 0,
-                    data: (old.data || []).map((n: any) => ({ ...n, is_read: true }))
+                    data: (old.data || []).map((n: NotificationItem) => ({ ...n, is_read: true }))
                 };
             });
             return { previousData };
         },
         onError: (err, _, context) => {
-            queryClient.setQueryData(notificationQueryKey, context?.previousData);
+            queryClient.setQueryData(queryKey, context?.previousData);
         },
     });
 

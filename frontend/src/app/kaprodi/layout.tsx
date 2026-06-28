@@ -5,6 +5,7 @@ import { ChangePasswordModal } from "@/components/ChangePasswordModal";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useQueryClient } from "@tanstack/react-query";
 import { BarChart4, ChevronRight, ClipboardCheck, KeyRound, LogOut } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -40,12 +41,14 @@ export default function KaprodiLayout({ children }: { children: React.ReactNode 
 function KaprodiSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
   const handleLogout = async () => {
     await logout();
+    queryClient.clear();
     router.push("/auth/login");
   };
 

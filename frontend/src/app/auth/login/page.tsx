@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CROSS_TAB_SESSION_MESSAGE } from "@/lib/auth-session";
 import { getRoleDashboard, useAuthStore } from "@/store/useAuthStore";
+import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Eye, EyeOff, Loader2, LogIn, Mail, X } from "lucide-react";
@@ -23,6 +24,7 @@ const fadeUp = {
 
 function LoginContent() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const login = useAuthStore((state) => state.login);
   const isLoading = useAuthStore((state) => state.isLoading);
@@ -84,7 +86,9 @@ function LoginContent() {
     }
 
     try {
+      queryClient.clear();
       await login(email, password);
+      queryClient.clear();
 
       // Get fresh user from store after login
       const user = useAuthStore.getState().user;

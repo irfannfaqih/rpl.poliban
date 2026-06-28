@@ -5,6 +5,7 @@ import { FOCUSED_STATUSES, getRedirectPath } from "@/lib/alur";
 import api from "@/lib/api";
 import { notificationQueryOptions } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { AlertCircle, Bell, CalendarDays, CheckCircle2, ChevronRight, Clock, Download, FileCheck, FileText, FolderOpen, GraduationCap, MapPin, User } from "lucide-react";
@@ -36,25 +37,28 @@ const getStepIndex = (status: string) => {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const userId = useAuthStore((state) => state.user?.id);
 
   const { data: pendaftaran, isLoading } = useQuery({
-    queryKey: ['pendaftaran', 'dashboard'],
+    queryKey: ["pemohon", userId, "pendaftaran", "dashboard"],
     queryFn: async () => {
       const { data: res } = await api.get('/pemohon/pendaftaran?view=dashboard');
       return res.data;
-    }
+    },
+    enabled: Boolean(userId),
   });
 
   const { data: me } = useQuery({
-    queryKey: ['me'],
+    queryKey: ["pemohon", userId, "me"],
     queryFn: async () => {
       const { data: res } = await api.get('/me');
       return res.user ?? null;
-    }
+    },
+    enabled: Boolean(userId),
   });
 
   const { data: latestNotif } = useQuery({
-    ...notificationQueryOptions,
+    ...notificationQueryOptions(userId),
     select: (data) => data.data?.[0] || null,
   });
 

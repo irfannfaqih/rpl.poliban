@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import api from "@/lib/api";
 import { openPrivateFile, privateAppealPath } from "@/lib/private-files";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 
 export default function HasilSanggahPage() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
   // PRD Bab 3.4: Pemohon wajib klik "Saya Mengerti" sebelum form sanggah terbuka
   const [briefingAcknowledged, setBriefingAcknowledged] = useState(false);
   const [showSanggahForm, setShowSanggahForm] = useState(false);
@@ -34,12 +36,14 @@ export default function HasilSanggahPage() {
   const [pahamProsedur, setPahamProsedur] = useState(false);
 
   const { data: pendaftaran, isLoading } = useQuery({
-    queryKey: ["hasil-pemohon"],
+    queryKey: ["pemohon", userId, "hasil"],
     queryFn: async () => {
       const { data: res } = await api.get("/pemohon/hasil");
       return res.data;
     },
+    enabled: Boolean(userId),
   });
+  const hasilQueryKey = ["pemohon", userId, "hasil"] as const;
 
   const statusAlur = pendaftaran?.status_alur || "pre_submit";
   const skStatus = pendaftaran?.sk_keputusan?.status;
@@ -101,7 +105,7 @@ export default function HasilSanggahPage() {
       setBuktiFiles([]);
       setBriefingAcknowledged(false);
       setPahamProsedur(false);
-      queryClient.invalidateQueries({ queryKey: ["hasil-pemohon"] });
+      queryClient.invalidateQueries({ queryKey: hasilQueryKey });
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Gagal mengajukan sanggahan");
     } finally {

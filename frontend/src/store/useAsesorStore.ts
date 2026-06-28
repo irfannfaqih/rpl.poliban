@@ -60,6 +60,7 @@ interface AsesorState {
   updateDraft: (tugasId: string, data: Partial<PraAsesmenDraft>) => void;
   clearDraft: (tugasId: string) => void;
   clearAllDrafts: () => void;
+  resetAsesorStore: () => void;
   getDraft: (tugasId: string) => PraAsesmenDraft;
 }
 
@@ -89,6 +90,8 @@ export const useAsesorStore = create<AsesorState>()(
         }),
 
       clearAllDrafts: () => set({ praAsesmenDrafts: {} }),
+
+      resetAsesorStore: () => set({ praAsesmenDrafts: {} }),
 
       getDraft: (tugasId) =>
         get().praAsesmenDrafts[tugasId] ?? { ...emptyDraft },

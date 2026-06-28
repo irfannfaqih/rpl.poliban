@@ -7,6 +7,7 @@ import { At2Countdown } from "@/components/at2/At2Countdown";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import api from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -44,6 +45,8 @@ function formatWaktu(waktu: string | null, durasi?: number | null) {
 export default function UjianTulisPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
+  const ujiLanjutanQueryKey = ["pemohon", userId, "uji-lanjutan"] as const;
   const [jawaban, setJawaban] = useState<Record<number, string>>({});
   const [isMengerjakan, setIsMengerjakan] = useState(false);
   const [showKonfirmasiModal, setShowKonfirmasiModal] = useState(false);
@@ -57,11 +60,12 @@ export default function UjianTulisPage() {
   const autosaveInFlightRef = useRef(false);
 
   const { data: ujian, isLoading, isError, refetch } = useQuery({
-    queryKey: ["pemohon", "uji-lanjutan"],
+    queryKey: ujiLanjutanQueryKey,
     queryFn: async () => {
       const res = await api.get("/pemohon/uji-lanjutan");
       return res.data?.data;
     },
+    enabled: Boolean(userId),
     retry: false,
     refetchInterval: (query) => {
       const data = query.state.data as any;
@@ -83,7 +87,7 @@ export default function UjianTulisPage() {
   const windowSelesai = ujian?.window_selesai || null;
 
   // ─── localStorage key unik per ujian ─────────────────────────────────────
-  const localKey = ujian?.id ? `at2_draft_${ujian.id}` : null;
+  const localKey = userId && ujian?.id ? `at2_draft_${userId}_${ujian.id}` : null;
 
   // Pulihkan jawaban dari localStorage saat ujian dimuat
   useEffect(() => {
@@ -212,7 +216,7 @@ export default function UjianTulisPage() {
       return api.post(`/pemohon/uji-lanjutan/${ujian.id}/submit`, { jawaban: payload });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pemohon", "uji-lanjutan"] });
+      queryClient.invalidateQueries({ queryKey: ujiLanjutanQueryKey });
       setShowSubmitModal(false);
       clearLocalDraft();
       toast.success("Jawaban berhasil dikirim");
@@ -223,14 +227,14 @@ export default function UjianTulisPage() {
 
   const konfirmasiMutation = useMutation({
     mutationFn: async () => api.post(`/pemohon/uji-lanjutan/${ujian.id}/konfirmasi`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["pemohon", "uji-lanjutan"] }); setShowKonfirmasiModal(false); toast.success("Kehadiran berhasil dikonfirmasi"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ujiLanjutanQueryKey }); setShowKonfirmasiModal(false); toast.success("Kehadiran berhasil dikonfirmasi"); },
     onError: (e: any) => toast.error(e.response?.data?.message || "Gagal konfirmasi kehadiran"),
   });
 
   const rescheduleMutation = useMutation({
     mutationFn: async () => api.post(`/pemohon/uji-lanjutan/${ujian.id}/reschedule`, { alasan: alasanReschedule }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pemohon", "uji-lanjutan"] });
+      queryClient.invalidateQueries({ queryKey: ujiLanjutanQueryKey });
       setShowRescheduleForm(false);
       setAlasanReschedule("");
       toast.success("Permohonan reschedule berhasil diajukan. Menunggu persetujuan Admin Prodi.");
