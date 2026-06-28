@@ -15,7 +15,7 @@ import {
   DialogTitle
 } from "@/components/ui/dialog";
 import { FOCUSED_STATUSES, getRedirectPath } from "@/lib/alur";
-import { useBorangStore } from "@/store/useBorangStore";
+import { BorangData, useBorangStore } from "@/store/useBorangStore";
 import { usePendaftaranStore } from "@/store/usePendaftaranStore";
 import { useShallow } from "zustand/react/shallow";
 import { AnimatePresence, motion } from "framer-motion";
@@ -52,19 +52,36 @@ const sections = [
   { id: "sectionD", label: "Evaluasi Diri", icon: FileCheck },
 ];
 
+type BorangDraftResponse = {
+  payload?: Partial<BorangData> | null;
+  last_saved_at?: string | null;
+} | null;
+
+const toSerializableDraftPayload = (data: BorangData): BorangData =>
+  JSON.parse(JSON.stringify(data)) as BorangData;
+
+const serializeDraftPayload = (data: BorangData): string =>
+  JSON.stringify(toSerializableDraftPayload(data));
+
 export default function BorangPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const {
+    data: borangData,
     activeSection,
     setActiveSection,
     validateSection,
-    lastSaved
+    lastSaved,
+    hydrateFromDraft,
+    markDraftSaved,
   } = useBorangStore(useShallow((state) => ({
+    data: state.data,
     activeSection: state.activeSection,
     setActiveSection: state.setActiveSection,
     validateSection: state.validateSection,
     lastSaved: state.lastSaved,
+    hydrateFromDraft: state.hydrateFromDraft,
+    markDraftSaved: state.markDraftSaved,
   })));
 
   const user = useAuthStore((state) => state.user);
@@ -88,12 +105,22 @@ export default function BorangPage() {
   });
 
   const statusAlur = pendaftaran?.status_alur || 'pre_submit';
+  const pendaftaranId = pendaftaran?.id;
 
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [autoSaveMsg, setAutoSaveMsg] = useState("");
+  const [draftReady, setDraftReady] = useState(false);
   const [showError, setShowError] = useState(false);
   const observerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const hydratedDraftOwnerRef = useRef<string | null>(null);
+  const suppressDirtyDetectionRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const saveInFlightRef = useRef(false);
+  const pendingSaveRef = useRef(false);
+  const latestDraftPayloadRef = useRef<BorangData | null>(null);
+  const latestSerializedPayloadRef = useRef("");
+  const lastSuccessfulSerializedPayloadRef = useRef("");
 
   // Access control
   const isAllowedStatus = statusAlur === 'pre_submit' || statusAlur === 'payment_verified';
@@ -133,10 +160,28 @@ export default function BorangPage() {
 
   const ownerContextConfirmed = Boolean(
     userId &&
-    pendaftaran?.id &&
+    pendaftaranId &&
     borangOwnerUserId === userId &&
-    borangOwnerPendaftaranId === pendaftaran.id,
+    borangOwnerPendaftaranId === pendaftaranId,
   );
+  const draftOwnerKey = ownerContextConfirmed && userId && pendaftaranId
+    ? `${userId}:${pendaftaranId}`
+    : null;
+
+  const {
+    data: serverDraft,
+    isError: isDraftError,
+    isFetched: isDraftFetched,
+    isLoading: isDraftLoading,
+  } = useQuery({
+    queryKey: ["pemohon", userId, "pendaftaran", pendaftaranId, "borang-draft"],
+    queryFn: async () => {
+      const { data: res } = await api.get(`/pemohon/pendaftaran/${pendaftaranId}/borang-draft`);
+      return res.data as BorangDraftResponse;
+    },
+    enabled: ownerContextConfirmed && Boolean(userId) && Boolean(pendaftaranId),
+    retry: false,
+  });
 
   const handleLogout = async () => {
     await logout();
@@ -147,15 +192,184 @@ export default function BorangPage() {
   // Calculate overall progress based on valid sections
   const validSectionsCount = sections.filter(s => validateSection(s.id, prodiId)).length;
 
-  // Auto-save simulation every 60s
   useEffect(() => {
-    const interval = setInterval(() => {
-      setAutoSaveMsg("Menyimpan otomatis...");
-      setTimeout(() => setAutoSaveMsg("Tersimpan"), 800);
-      setTimeout(() => setAutoSaveMsg(""), 3000);
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    hydratedDraftOwnerRef.current = null;
+    suppressDirtyDetectionRef.current = false;
+    dirtyRef.current = false;
+    saveInFlightRef.current = false;
+    pendingSaveRef.current = false;
+    latestDraftPayloadRef.current = null;
+    latestSerializedPayloadRef.current = "";
+    lastSuccessfulSerializedPayloadRef.current = "";
+    setDraftReady(false);
+    setAutoSaveMsg(draftOwnerKey ? "Memuat draft..." : "");
+  }, [draftOwnerKey]);
+
+  useEffect(() => {
+    if (!draftOwnerKey || !ownerContextConfirmed || !userId || !pendaftaranId) return;
+    if (hydratedDraftOwnerRef.current === draftOwnerKey) return;
+    if (!isDraftFetched && !isDraftError) return;
+
+    hydratedDraftOwnerRef.current = draftOwnerKey;
+
+    if (isDraftError) {
+      const serialized = serializeDraftPayload(borangData);
+      latestDraftPayloadRef.current = toSerializableDraftPayload(borangData);
+      latestSerializedPayloadRef.current = serialized;
+      lastSuccessfulSerializedPayloadRef.current = serialized;
+      dirtyRef.current = false;
+      setDraftReady(true);
+      setAutoSaveMsg("Gagal memuat draft, memakai draft lokal");
+      return;
+    }
+
+    if (serverDraft?.payload) {
+      suppressDirtyDetectionRef.current = true;
+      hydrateFromDraft(serverDraft.payload, {
+        userId,
+        pendaftaranId,
+        lastSavedAt: serverDraft.last_saved_at ?? null,
+      });
+      setAutoSaveMsg("Tersimpan ke server");
+      setDraftReady(true);
+      return;
+    }
+
+    const serialized = serializeDraftPayload(borangData);
+    latestDraftPayloadRef.current = toSerializableDraftPayload(borangData);
+    latestSerializedPayloadRef.current = serialized;
+    lastSuccessfulSerializedPayloadRef.current = serialized;
+    dirtyRef.current = false;
+    setDraftReady(true);
+    setAutoSaveMsg("Belum ada perubahan");
+  }, [
+    borangData,
+    draftOwnerKey,
+    hydrateFromDraft,
+    isDraftError,
+    isDraftFetched,
+    ownerContextConfirmed,
+    pendaftaranId,
+    serverDraft,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (!draftOwnerKey || !draftReady) return;
+
+    const payload = toSerializableDraftPayload(borangData);
+    const serialized = JSON.stringify(payload);
+    latestDraftPayloadRef.current = payload;
+    latestSerializedPayloadRef.current = serialized;
+
+    if (suppressDirtyDetectionRef.current) {
+      suppressDirtyDetectionRef.current = false;
+      lastSuccessfulSerializedPayloadRef.current = serialized;
+      dirtyRef.current = false;
+      return;
+    }
+
+    const isDirty = serialized !== lastSuccessfulSerializedPayloadRef.current;
+    dirtyRef.current = isDirty;
+    if (isDirty && !saveInFlightRef.current) {
+      setAutoSaveMsg("Perubahan belum disimpan");
+    } else if (!isDirty && !lastSaved) {
+      setAutoSaveMsg("Belum ada perubahan");
+    }
+  }, [borangData, draftOwnerKey, draftReady, lastSaved]);
+
+  const saveDraft = useCallback(async function saveDraftNow() {
+    if (
+      !ownerContextConfirmed ||
+      !draftReady ||
+      !pendaftaranId ||
+      submitting ||
+      !dirtyRef.current
+    ) {
+      return;
+    }
+
+    if (saveInFlightRef.current) {
+      pendingSaveRef.current = true;
+      return;
+    }
+
+    const payload = latestDraftPayloadRef.current ?? toSerializableDraftPayload(useBorangStore.getState().data);
+    const serialized = latestSerializedPayloadRef.current || JSON.stringify(payload);
+
+    if (serialized === lastSuccessfulSerializedPayloadRef.current) {
+      dirtyRef.current = false;
+      setAutoSaveMsg("Tersimpan ke server");
+      return;
+    }
+
+    saveInFlightRef.current = true;
+    setAutoSaveMsg("Menyimpan ke server...");
+
+    try {
+      const { data: res } = await api.patch(`/pemohon/pendaftaran/${pendaftaranId}/borang-draft`, {
+        payload,
+      });
+      const savedAt = res.data?.last_saved_at ?? null;
+      const currentSerialized = latestSerializedPayloadRef.current;
+
+      lastSuccessfulSerializedPayloadRef.current = serialized;
+      markDraftSaved(savedAt);
+
+      if (currentSerialized === serialized) {
+        dirtyRef.current = false;
+        setAutoSaveMsg("Tersimpan ke server");
+      } else {
+        dirtyRef.current = true;
+        pendingSaveRef.current = true;
+        setAutoSaveMsg("Perubahan belum disimpan");
+      }
+    } catch (error) {
+      console.error(error);
+      setAutoSaveMsg("Gagal menyimpan, draft lokal tersedia");
+    } finally {
+      saveInFlightRef.current = false;
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        window.setTimeout(() => {
+          void saveDraftNow();
+        }, 0);
+      }
+    }
+  }, [draftReady, markDraftSaved, ownerContextConfirmed, pendaftaranId, submitting]);
+
+  useEffect(() => {
+    if (!draftReady || !dirtyRef.current) return;
+
+    const timeout = window.setTimeout(() => {
+      void saveDraft();
+    }, 2000);
+
+    return () => window.clearTimeout(timeout);
+  }, [borangData, draftReady, saveDraft]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+
+    const interval = window.setInterval(() => {
+      if (dirtyRef.current) {
+        void saveDraft();
+      }
+    }, 30000);
+
+    return () => window.clearInterval(interval);
+  }, [draftReady, saveDraft]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && dirtyRef.current) {
+        void saveDraft();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [saveDraft]);
 
   // Scroll-spy: pilih section yang sedang berada paling dekat dengan area baca.
   useEffect(() => {
@@ -360,7 +574,7 @@ export default function BorangPage() {
 
   // If not mounted or not allowed, render a simple loader while redirecting
   // to avoid rendering the heavy BorangPage components and sidebars incorrectly.
-  if (!mounted || isLoading || !isAllowedStatus || !isFocusedMode || !ownerContextConfirmed) {
+  if (!mounted || isLoading || isDraftLoading || !draftReady || !isAllowedStatus || !isFocusedMode || !ownerContextConfirmed) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -398,7 +612,7 @@ export default function BorangPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              {autoSaveMsg === "Tersimpan" ? (
+              {autoSaveMsg === "Tersimpan ke server" ? (
                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
               ) : (
                 <Save className="h-3.5 w-3.5 animate-pulse" />

@@ -23,7 +23,7 @@ export interface DokumenWajib {
   TranskripUrl?: string;
 }
 
-interface BorangData {
+export interface BorangData {
   sectionA: Record<string, string>;
   sectionB: Record<string, unknown[]>;
   sectionC: Record<string, any>;
@@ -47,6 +47,15 @@ interface BorangState {
   lastSaved: Date | null;
   touchedSections: string[];
   setOwnerContext: (userId: number | null, pendaftaranId: number | null) => void;
+  hydrateFromDraft: (
+    payload: Partial<BorangData>,
+    context: {
+      userId: number;
+      pendaftaranId: number;
+      lastSavedAt?: string | null;
+    },
+  ) => void;
+  markDraftSaved: (lastSavedAt?: string | null) => void;
   updateSection: (section: keyof BorangData, values: BorangData[keyof BorangData]) => void;
   setActiveSection: (section: string) => void;
   setSectionTouched: (section: string) => void;
@@ -99,6 +108,48 @@ const initialBorangData: BorangData = {
 const freshBorangData = (): BorangData =>
   JSON.parse(JSON.stringify(initialBorangData)) as BorangData;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const parseSavedAt = (value?: string | null): Date =>
+  value ? new Date(value) : new Date();
+
+const mergeDraftPayload = (payload: Partial<BorangData>): BorangData => {
+  const fresh = freshBorangData();
+  const sectionD: Record<string, unknown> = isRecord(payload.sectionD) ? payload.sectionD : {};
+  const sectionE: Record<string, unknown> = isRecord(payload.sectionE) ? payload.sectionE : {};
+
+  return {
+    sectionA: {
+      ...fresh.sectionA,
+      ...(isRecord(payload.sectionA) ? payload.sectionA : {}),
+    } as BorangData['sectionA'],
+    sectionB: {
+      ...fresh.sectionB,
+      ...(isRecord(payload.sectionB) ? payload.sectionB : {}),
+    } as BorangData['sectionB'],
+    sectionC: {
+      ...fresh.sectionC,
+      ...(isRecord(payload.sectionC) ? payload.sectionC : {}),
+    } as BorangData['sectionC'],
+    sectionD: {
+      ...fresh.sectionD,
+      ...sectionD,
+      evaluasi: isRecord(sectionD.evaluasi) ? sectionD.evaluasi : fresh.sectionD.evaluasi,
+    } as BorangData['sectionD'],
+    sectionE: {
+      ...fresh.sectionE,
+      ...sectionE,
+      dokumenWajib: isRecord(sectionE.dokumenWajib)
+        ? sectionE.dokumenWajib
+        : fresh.sectionE.dokumenWajib,
+      dokumenTambahan: Array.isArray(sectionE.dokumenTambahan)
+        ? sectionE.dokumenTambahan
+        : fresh.sectionE.dokumenTambahan,
+    } as BorangData['sectionE'],
+  };
+};
+
 /* ------------------------------------------------------------------ */
 /*  Store                                                              */
 /* ------------------------------------------------------------------ */
@@ -132,10 +183,25 @@ export const useBorangStore = create<BorangState>()(
         });
       },
 
+      hydrateFromDraft: (payload, context) => {
+        if (!isRecord(payload)) return;
+
+        set({
+          ownerUserId: context.userId,
+          ownerPendaftaranId: context.pendaftaranId,
+          data: mergeDraftPayload(payload),
+          lastSaved: parseSavedAt(context.lastSavedAt),
+        });
+      },
+
+      markDraftSaved: (lastSavedAt) =>
+        set({
+          lastSaved: parseSavedAt(lastSavedAt),
+        }),
+
       updateSection: (section, values) =>
         set((state) => ({
           data: { ...state.data, [section]: values },
-          lastSaved: new Date()
         })),
 
       setActiveSection: (section) => {
