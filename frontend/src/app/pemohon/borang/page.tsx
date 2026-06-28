@@ -118,6 +118,8 @@ export default function BorangPage() {
   const dirtyRef = useRef(false);
   const saveInFlightRef = useRef(false);
   const pendingSaveRef = useRef(false);
+  const finalSubmitInProgressRef = useRef(false);
+  const finalSubmitCompletedRef = useRef(false);
   const latestDraftPayloadRef = useRef<BorangData | null>(null);
   const latestSerializedPayloadRef = useRef("");
   const lastSuccessfulSerializedPayloadRef = useRef("");
@@ -167,6 +169,7 @@ export default function BorangPage() {
   const draftOwnerKey = ownerContextConfirmed && userId && pendaftaranId
     ? `${userId}:${pendaftaranId}`
     : null;
+  const draftQueryKey = ["pemohon", userId, "pendaftaran", pendaftaranId, "borang-draft"] as const;
 
   const {
     data: serverDraft,
@@ -174,7 +177,7 @@ export default function BorangPage() {
     isFetched: isDraftFetched,
     isLoading: isDraftLoading,
   } = useQuery({
-    queryKey: ["pemohon", userId, "pendaftaran", pendaftaranId, "borang-draft"],
+    queryKey: draftQueryKey,
     queryFn: async () => {
       const { data: res } = await api.get(`/pemohon/pendaftaran/${pendaftaranId}/borang-draft`);
       return res.data as BorangDraftResponse;
@@ -198,6 +201,8 @@ export default function BorangPage() {
     dirtyRef.current = false;
     saveInFlightRef.current = false;
     pendingSaveRef.current = false;
+    finalSubmitInProgressRef.current = false;
+    finalSubmitCompletedRef.current = false;
     latestDraftPayloadRef.current = null;
     latestSerializedPayloadRef.current = "";
     lastSuccessfulSerializedPayloadRef.current = "";
@@ -255,7 +260,7 @@ export default function BorangPage() {
   ]);
 
   useEffect(() => {
-    if (!draftOwnerKey || !draftReady) return;
+    if (!draftOwnerKey || !draftReady || finalSubmitCompletedRef.current) return;
 
     const payload = toSerializableDraftPayload(borangData);
     const serialized = JSON.stringify(payload);
@@ -283,6 +288,8 @@ export default function BorangPage() {
       !ownerContextConfirmed ||
       !draftReady ||
       !pendaftaranId ||
+      finalSubmitInProgressRef.current ||
+      finalSubmitCompletedRef.current ||
       submitting ||
       !dirtyRef.current
     ) {
@@ -440,6 +447,7 @@ export default function BorangPage() {
   const executeFinalSubmit = async () => {
     setShowSubmitDialog(false);
     setSubmitting(true);
+    finalSubmitInProgressRef.current = true;
     try {
       const borangData = useBorangStore.getState().data;
       const validUrls: string[] = [];
@@ -562,10 +570,25 @@ export default function BorangPage() {
       await api.post(`/pemohon/pendaftaran/${pendaftaran?.id}/submit`, {
         valid_dokumen_urls: validUrls
       });
+      finalSubmitCompletedRef.current = true;
+      dirtyRef.current = false;
+      pendingSaveRef.current = false;
+      lastSuccessfulSerializedPayloadRef.current = latestSerializedPayloadRef.current;
+
+      if (pendaftaranId) {
+        try {
+          await api.delete(`/pemohon/pendaftaran/${pendaftaranId}/borang-draft`);
+          queryClient.removeQueries({ queryKey: draftQueryKey, exact: true });
+          setAutoSaveMsg("Draft tersubmit");
+        } catch (deleteError) {
+          console.warn("Final submit succeeded, but draft cleanup failed.", deleteError);
+        }
+      }
       // Refetch to get new status
       await refetch();
     } catch (e) {
       console.error(e);
+      finalSubmitInProgressRef.current = false;
     } finally {
       setSubmitting(false);
       router.push("/pemohon/dashboard");
