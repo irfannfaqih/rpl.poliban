@@ -121,6 +121,20 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
     }));
   };
 
+  const setAllVatcValue = (cpmkId: number, value: boolean) => {
+    if (isReadOnly) return;
+    setPenilaian((prev) => ({
+      ...prev,
+      [cpmkId]: {
+        ...getItem(cpmkId),
+        valid: value,
+        autentik: value,
+        terkini: value,
+        cukup: value,
+      },
+    }));
+  };
+
   // Hitung jumlah CPMK yang sudah dinilai
   const totalCpmkCount = mataKuliahList.reduce((acc: number, mk: any) => acc + (mk.cpmk?.length || 0), 0);
   const assessedCpmkCount = Object.values(penilaian).filter(isCpmkComplete).length;
@@ -369,43 +383,61 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
                               <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                 Evaluasi Bukti (VATC) <span className="text-destructive">*</span>
                               </span>
-                              <div className="flex gap-1.5">
-                                {VATC_ITEMS.map((v) => {
-                                  const state = val[v.key];
-                                  return (
-                                    <DropdownMenu key={v.key}>
-                                      <DropdownMenuTrigger
-                                        disabled={isReadOnly}
-                                        title={v.desc}
-                                        className={`w-9 h-9 rounded-lg border-2 font-mono font-bold text-xs transition-all active:scale-95 flex items-center justify-center outline-none duration-200 ${state === true ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" :
-                                          state === false ? "bg-red-500 border-red-500 text-white shadow-sm" :
-                                            "bg-background border-border text-muted-foreground hover:border-primary/50 hover:bg-muted/50"
-                                          }`}
-                                      >
-                                        {state === true ? <CheckCircle2 className="h-4 w-4 animate-in fade-in zoom-in duration-300" /> :
-                                          state === false ? <XCircle className="h-4 w-4 animate-in fade-in zoom-in duration-300" /> :
-                                            v.label}
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="center" className="w-48">
-                                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b mb-1">
-                                          {v.title}
-                                        </div>
-                                        <DropdownMenuItem onClick={() => setVatcValue(cpmk.id, v.key, true)} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
-                                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                                          <span>Memenuhi</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setVatcValue(cpmk.id, v.key, false)} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
-                                          <XCircle className="mr-2 h-4 w-4" />
-                                          <span>Tidak Memenuhi</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setVatcValue(cpmk.id, v.key, null)} className="text-muted-foreground cursor-pointer">
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          <span>Kosongkan</span>
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  );
-                                })}
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <div className="flex gap-1.5">
+                                  {VATC_ITEMS.map((v) => {
+                                    const state = val[v.key];
+                                    return (
+                                      <DropdownMenu key={v.key}>
+                                        <DropdownMenuTrigger
+                                          disabled={isReadOnly}
+                                          title={v.desc}
+                                          className={`w-9 h-9 rounded-lg border-2 font-mono font-bold text-xs transition-all active:scale-95 flex items-center justify-center outline-none duration-200 ${state === true ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" :
+                                            state === false ? "bg-red-500 border-red-500 text-white shadow-sm" :
+                                              "bg-background border-border text-muted-foreground hover:border-primary/50 hover:bg-muted/50"
+                                            }`}
+                                        >
+                                          {state === true ? <CheckCircle2 className="h-4 w-4 animate-in fade-in zoom-in duration-300" /> :
+                                            state === false ? <XCircle className="h-4 w-4 animate-in fade-in zoom-in duration-300" /> :
+                                              v.label}
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="center" className="w-48">
+                                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b mb-1">
+                                            {v.title}
+                                          </div>
+                                          <DropdownMenuItem onClick={() => setVatcValue(cpmk.id, v.key, true)} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            <span>Memenuhi</span>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => setVatcValue(cpmk.id, v.key, false)} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
+                                            <XCircle className="mr-2 h-4 w-4" />
+                                            <span>Tidak Memenuhi</span>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => setVatcValue(cpmk.id, v.key, null)} className="text-muted-foreground cursor-pointer">
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            <span>Kosongkan</span>
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    );
+                                  })}
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={() => setAllVatcValue(cpmk.id, true)}
+                                  className="h-8 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 text-[10px] font-bold text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-emerald-400"
+                                >
+                                  Semua Memenuhi
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={() => setAllVatcValue(cpmk.id, false)}
+                                  className="h-8 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 text-[10px] font-bold text-red-700 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
+                                >
+                                  Semua Tidak Memenuhi
+                                </button>
                               </div>
                               {vatcIncomplete && (
                                 <p className="max-w-xs text-[10px] font-medium text-destructive">
