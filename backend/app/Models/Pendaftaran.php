@@ -70,6 +70,11 @@ class Pendaftaran extends Model
         return $this->hasOne(BorangDataDiri::class);
     }
 
+    public function borangDraft()
+    {
+        return $this->hasOne(BorangDraft::class);
+    }
+
     public function riwayatPendidikan()
     {
         return $this->hasMany(RiwayatPendidikan::class);

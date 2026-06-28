@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Kaprodi\PlenoApprovalController as KaprodiPlenoApprovalController;
 use App\Http\Controllers\Api\Payment\MidtransNotificationController;
 use App\Http\Controllers\Api\Pemohon\BorangController;
+use App\Http\Controllers\Api\Pemohon\BorangDraftController;
 use App\Http\Controllers\Api\Pemohon\PaymentController;
 use App\Http\Controllers\Api\Pemohon\PembayaranController;
 use App\Http\Controllers\Api\Pemohon\PemohonExtraController;
@@ -338,6 +339,18 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('pendaftaran/{pendaftaran}/dokumen', [
                 BorangController::class,
                 'uploadDokumen',
+            ]);
+            Route::get('pendaftaran/{pendaftaran}/borang-draft', [
+                BorangDraftController::class,
+                'show',
+            ]);
+            Route::patch('pendaftaran/{pendaftaran}/borang-draft', [
+                BorangDraftController::class,
+                'update',
+            ]);
+            Route::delete('pendaftaran/{pendaftaran}/borang-draft', [
+                BorangDraftController::class,
+                'destroy',
             ]);
             Route::delete('pendaftaran/{pendaftaran}/dokumen/{dokumen}', [
                 BorangController::class,
