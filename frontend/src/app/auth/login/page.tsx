@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CROSS_TAB_SESSION_MESSAGE } from "@/lib/auth-session";
 import { getRoleDashboard, useAuthStore } from "@/store/useAuthStore";
 import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -71,7 +70,7 @@ function LoginContent() {
   const infoMessage = sessionExpired
     ? "Sesi Anda telah berakhir. Silakan login kembali."
     : sessionChanged
-      ? CROSS_TAB_SESSION_MESSAGE
+      ? "Sesi tab ini telah berubah. Silakan login kembali."
       : reason === "inactivity"
         ? "Anda dikeluarkan karena tidak ada aktivitas selama 2 jam."
         : null;

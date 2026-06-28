@@ -1,8 +1,5 @@
 export const AUTH_TOKEN_KEY = "auth_token";
 export const AUTH_STORAGE_KEY = "auth-storage";
-export const CROSS_TAB_SESSION_MESSAGE_KEY = "auth-session-change-message";
-export const CROSS_TAB_SESSION_MESSAGE =
-  "Sesi berubah di tab lain, halaman dimuat ulang.";
 
 export const WORKFLOW_STORAGE_KEYS = [
   "pendaftaran-storage",
@@ -21,6 +18,28 @@ const removeFromBrowserStorage = (key: string) => {
   sessionStorage.removeItem(key);
 };
 
+export const getAuthToken = () => {
+  if (typeof window === "undefined") return null;
+
+  return sessionStorage.getItem(AUTH_TOKEN_KEY);
+};
+
+export const setAuthToken = (token: string) => {
+  if (typeof window === "undefined") return;
+
+  sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+};
+
+export const removeAuthToken = () => {
+  if (typeof window === "undefined") return;
+
+  sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+};
+
 export const clearWorkflowStorage = () => {
   if (typeof window === "undefined") return;
 
@@ -35,13 +54,4 @@ export const clearBrowserSessionStorage = () => {
   SESSION_STORAGE_KEYS.forEach((key) => {
     removeFromBrowserStorage(key);
   });
-};
-
-export const markCrossTabSessionChanged = () => {
-  if (typeof window === "undefined") return;
-
-  sessionStorage.setItem(
-    CROSS_TAB_SESSION_MESSAGE_KEY,
-    CROSS_TAB_SESSION_MESSAGE,
-  );
 };

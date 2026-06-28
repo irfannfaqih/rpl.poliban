@@ -1,18 +1,10 @@
 "use client";
 
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
-import {
-  AUTH_STORAGE_KEY,
-  AUTH_TOKEN_KEY,
-  CROSS_TAB_SESSION_MESSAGE_KEY,
-  clearWorkflowStorage,
-  markCrossTabSessionChanged,
-} from "@/lib/auth-session";
-import { getRoleDashboard, resetWorkflowStores, useAuthStore } from "@/store/useAuthStore";
-import { useQueryClient } from "@tanstack/react-query";
+import { getAuthToken } from "@/lib/auth-session";
+import { getRoleDashboard, useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -34,7 +26,6 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const fetchMe = useAuthStore((state) => state.fetchMe);
-  const queryClient = useQueryClient();
   const router = useRouter();
   // isVerifying: true selama re-validasi token ke server berlangsung
   const [isVerifying, setIsVerifying] = useState(true);
@@ -43,44 +34,9 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   useInactivityLogout();
 
   useEffect(() => {
-    const pendingMessage = sessionStorage.getItem(CROSS_TAB_SESSION_MESSAGE_KEY);
-    if (pendingMessage) {
-      sessionStorage.removeItem(CROSS_TAB_SESSION_MESSAGE_KEY);
-      toast.info(pendingMessage);
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (![AUTH_TOKEN_KEY, AUTH_STORAGE_KEY].includes(event.key || "")) {
-        return;
-      }
-
-      if (event.oldValue === event.newValue) {
-        return;
-      }
-
-      clearWorkflowStorage();
-      resetWorkflowStores();
-      queryClient.clear();
-      markCrossTabSessionChanged();
-
-      if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
-        window.location.href = "/auth/login?session_changed=1";
-        return;
-      }
-
-      window.location.reload();
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, [queryClient]);
-
-  useEffect(() => {
     async function verify() {
-      // Cek langsung ke localStorage karena state Zustand mungkin belum selesai hidrasi (delay SSR)
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      // Cek langsung ke sessionStorage karena state Zustand mungkin belum selesai hidrasi (delay SSR)
+      const token = getAuthToken();
       if (!token) {
         router.replace("/auth/login");
         return;

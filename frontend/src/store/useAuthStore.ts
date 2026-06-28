@@ -1,9 +1,9 @@
 import api from "@/lib/api";
 import {
   AUTH_STORAGE_KEY,
-  AUTH_TOKEN_KEY,
   clearBrowserSessionStorage,
   clearWorkflowStorage,
+  setAuthToken,
 } from "@/lib/auth-session";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -102,7 +102,7 @@ export const useAuthStore = create<AuthState>()(
           clearSessionState();
 
           // Store token separately for API interceptor
-          localStorage.setItem(AUTH_TOKEN_KEY, token);
+          setAuthToken(token);
           api.defaults.headers.common.Authorization = `Bearer ${token}`;
 
           set({
@@ -165,7 +165,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: AUTH_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         user: state.user,
         token: state.token,

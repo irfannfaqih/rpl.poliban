@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { AUTH_TOKEN_KEY, clearBrowserSessionStorage } from "@/lib/auth-session";
+import { clearBrowserSessionStorage, setAuthToken } from "@/lib/auth-session";
 import { toast } from "sonner";
 import { resetWorkflowStores, useAuthStore } from "@/store/useAuthStore";
 
@@ -85,7 +85,7 @@ export default function RegisterPage() {
       queryClient.clear();
       clearBrowserSessionStorage(); // Clear old session state without emitting a logout event first
       resetWorkflowStores();
-      localStorage.setItem(AUTH_TOKEN_KEY, regRes.token);
+      setAuthToken(regRes.token);
       api.defaults.headers.common["Authorization"] = `Bearer ${regRes.token}`;
       useAuthStore.setState({
         token: regRes.token,

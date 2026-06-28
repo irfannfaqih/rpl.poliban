@@ -1,9 +1,9 @@
 import axios from "axios";
 import { toast } from "sonner";
 import {
-  AUTH_STORAGE_KEY,
-  AUTH_TOKEN_KEY,
+  clearBrowserSessionStorage,
   clearWorkflowStorage,
+  getAuthToken,
 } from "./auth-session";
 
 const API_BASE_URL =
@@ -20,9 +20,11 @@ const api = axios.create({
 // Request interceptor — attach token
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const token = getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      delete config.headers.Authorization;
     }
   }
   return config;
@@ -36,9 +38,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== "undefined") {
         if (!window.location.pathname.startsWith("/auth/")) {
-          localStorage.removeItem(AUTH_TOKEN_KEY);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
+          clearBrowserSessionStorage();
           clearWorkflowStorage();
+          delete api.defaults.headers.common.Authorization;
           window.location.href = "/auth/login?session_expired=1";
         }
       }
