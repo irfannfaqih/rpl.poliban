@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   FileText,
-  CreditCard,
   ClipboardCheck,
   Users,
   Award,
@@ -12,6 +11,11 @@ import {
   GraduationCap,
   BookOpen,
   Shield,
+  HelpCircle,
+  Building2,
+  Mail,
+  MapPin,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -93,6 +97,72 @@ const features = [
   },
 ];
 
+const faqs = [
+  {
+    question: "Apa itu Rekognisi Pembelajaran Lampau (RPL)?",
+    answer:
+      "RPL adalah jalur pengakuan atas capaian pembelajaran yang diperoleh dari pendidikan formal, nonformal, informal, atau pengalaman kerja, sesuai ketentuan yang berlaku.",
+  },
+  {
+    question: "Siapa yang dapat mendaftar?",
+    answer:
+      "Calon peserta yang memiliki riwayat pendidikan atau pengalaman belajar/kerja yang relevan dapat mengajukan pendaftaran. Kelayakan akhir tetap mengikuti verifikasi dan asesmen oleh pengelola.",
+  },
+  {
+    question: "Dokumen apa yang perlu disiapkan?",
+    answer:
+      "Dokumen dapat mencakup identitas diri, ijazah/transkrip, bukti pengalaman kerja, sertifikat, portofolio, atau dokumen pendukung lain sesuai persyaratan program studi.",
+  },
+  {
+    question: "Apakah semua mata kuliah otomatis diakui?",
+    answer:
+      "Tidak otomatis. Pengakuan dilakukan melalui proses verifikasi, asesmen mandiri, penilaian asesor, dan penetapan sesuai hasil evaluasi.",
+  },
+  {
+    question: "Bagaimana saya memantau proses pendaftaran?",
+    answer:
+      "Setelah memiliki akun, pemohon dapat memantau status pendaftaran, pembayaran, verifikasi dokumen, asesmen, hingga hasil melalui dashboard.",
+  },
+  {
+    question: "Bagaimana jika dokumen perlu diperbaiki?",
+    answer:
+      "Jika ada dokumen yang belum sesuai, pemohon dapat menerima catatan revisi dan mengunggah perbaikan melalui sistem sesuai arahan pengelola.",
+  },
+  {
+    question: "Apakah tersedia mekanisme sanggah?",
+    answer:
+      "Mekanisme sanggah dapat tersedia sesuai ketentuan dan jadwal yang ditetapkan. Informasi lebih lanjut akan ditampilkan pada dashboard pemohon jika tahap tersebut dibuka.",
+  },
+  {
+    question: "Bagaimana ketentuan refund/pengembalian dana?",
+    answer:
+      "Ketentuan pengembalian dana mengikuti kebijakan resmi pengelola RPL POLIBAN. Pengajuan tertentu seperti pembayaran ganda atau kendala sistem dapat diverifikasi oleh pengelola.",
+  },
+];
+
+const contactCards = [
+  {
+    icon: Building2,
+    title: "Unit Pengelola RPL",
+    desc: "Politeknik Negeri Banjarmasin",
+  },
+  {
+    icon: Mail,
+    title: "Kanal Bantuan",
+    desc: "Kontak resmi pengelola RPL POLIBAN akan diperbarui.",
+  },
+  {
+    icon: MapPin,
+    title: "Lokasi",
+    desc: "Banjarmasin, Kalimantan Selatan",
+  },
+  {
+    icon: Clock,
+    title: "Jam Layanan",
+    desc: "Hari dan jam layanan mengikuti jadwal kerja resmi kampus.",
+  },
+];
+
 /* ------------------------------------------------------------------ */
 /*  Floating Shape Components (decorative)                             */
 /* ------------------------------------------------------------------ */
@@ -152,7 +222,7 @@ function Navbar() {
         </Link>
 
         {/* Nav links */}
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-6 md:flex">
           <a
             href="#tentang"
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -164,6 +234,18 @@ function Navbar() {
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             Alur Pendaftaran
+          </a>
+          <a
+            href="#faq"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            FAQ
+          </a>
+          <a
+            href="#kontak"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Kontak
           </a>
         </nav>
 
@@ -410,6 +492,145 @@ function StepsSection() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  FAQ                                                                */
+/* ------------------------------------------------------------------ */
+function FAQSection() {
+  return (
+    <section id="faq" className="border-t border-border/60 bg-card px-6 py-24">
+      <div className="mx-auto max-w-6xl">
+        <motion.div
+          className="text-center"
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          custom={0}
+        >
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary">
+            Pertanyaan Umum
+          </p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
+            Informasi Seputar RPL
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            Temukan jawaban singkat mengenai pendaftaran, dokumen, asesmen, dan
+            pemantauan proses RPL melalui sistem.
+          </p>
+        </motion.div>
+
+        <motion.div
+          className="mt-14 grid gap-5 md:grid-cols-2"
+          variants={stagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.15 }}
+        >
+          {faqs.map((faq, i) => (
+            <motion.div
+              key={faq.question}
+              variants={fadeUp}
+              custom={i}
+              className="group rounded-2xl border border-border/60 bg-background p-6 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <HelpCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold leading-snug text-foreground">
+                    {faq.question}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {faq.answer}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Contact                                                            */
+/* ------------------------------------------------------------------ */
+function ContactSection() {
+  return (
+    <section id="kontak" className="px-6 py-24">
+      <div className="mx-auto max-w-6xl">
+        <motion.div
+          className="text-center"
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          custom={0}
+        >
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary">
+            Kontak & Bantuan
+          </p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
+            Butuh Informasi Lebih Lanjut?
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            Gunakan kanal resmi pengelola RPL POLIBAN untuk memperoleh informasi
+            terbaru mengenai pendaftaran dan layanan bantuan.
+          </p>
+        </motion.div>
+
+        <motion.div
+          className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
+          variants={stagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+        >
+          {contactCards.map((card, i) => (
+            <motion.div
+              key={card.title}
+              variants={fadeUp}
+              custom={i}
+              className="rounded-2xl border border-border/60 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <card.icon className="h-5 w-5" />
+              </div>
+              <h3 className="mt-5 font-semibold">{card.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {card.desc}
+              </p>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        <motion.div
+          className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row"
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          custom={0}
+        >
+          <Link href="/auth/register">
+            <Button size="lg" className="h-12 rounded-xl px-6">
+              Daftar Sekarang
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+          <Link href="/auth/login">
+            <Button variant="outline" size="lg" className="h-12 rounded-xl px-6">
+              Masuk ke Dashboard
+            </Button>
+          </Link>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  CTA                                                                */
 /* ------------------------------------------------------------------ */
 function CTASection() {
@@ -449,40 +670,73 @@ function CTASection() {
 /* ------------------------------------------------------------------ */
 function Footer() {
   return (
-    <footer className="border-t border-border/60 bg-card px-6 py-12">
+    <footer className="border-t border-border/60 bg-card px-6 py-14">
       <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+        <div className="grid gap-8 md:grid-cols-4 md:items-start">
           {/* Brand */}
-          <div className="flex items-center gap-2.5">
-            <div className="relative h-9 w-9">
-              <Image 
-                src="/poliban.png" 
-                alt="Logo POLIBAN" 
-                fill 
-                className="object-contain"
-              />
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="relative h-9 w-9">
+                <Image
+                  src="/poliban.png"
+                  alt="Logo POLIBAN"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              <div className="flex flex-col leading-tight">
+                <span className="text-sm font-semibold tracking-tight uppercase">
+                  Sistem RPL
+                </span>
+                <span className="text-[11px] font-medium text-muted-foreground italic">
+                  Politeknik Negeri Banjarmasin
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold tracking-tight uppercase">
-                Sistem RPL
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground italic">
-                Politeknik Negeri Banjarmasin
-              </span>
-            </div>
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              Platform pendaftaran dan pengelolaan Rekognisi Pembelajaran Lampau
+              Politeknik Negeri Banjarmasin.
+            </p>
           </div>
 
           {/* Links */}
-          <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <div className="flex flex-col items-start gap-3 text-sm text-muted-foreground">
+            <h3 className="text-sm font-semibold text-foreground">Navigasi</h3>
             <a href="#tentang" className="hover:text-foreground transition-colors">
               Tentang
             </a>
             <a href="#alur" className="hover:text-foreground transition-colors">
               Alur
             </a>
+            <a href="#faq" className="hover:text-foreground transition-colors">
+              FAQ
+            </a>
+            <a href="#kontak" className="hover:text-foreground transition-colors">
+              Kontak
+            </a>
+          </div>
+
+          <div className="flex flex-col items-start gap-3 text-sm text-muted-foreground">
+            <h3 className="text-sm font-semibold text-foreground">Akses</h3>
             <Link href="/auth/login" className="hover:text-foreground transition-colors">
               Masuk
             </Link>
+            <Link href="/auth/register" className="hover:text-foreground transition-colors">
+              Daftar Sekarang
+            </Link>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold">Informasi</h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Kebijakan refund, syarat & ketentuan, serta kebijakan privasi akan
+              disesuaikan dengan ketentuan resmi pengelola.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 text-xs text-muted-foreground/70">
+              <span>Kebijakan Refund</span>
+              <span>Syarat & Ketentuan</span>
+              <span>Kebijakan Privasi</span>
+            </div>
           </div>
         </div>
 
@@ -506,6 +760,8 @@ export default function LandingPage() {
         <HeroSection />
         <AboutSection />
         <StepsSection />
+        <FAQSection />
+        <ContactSection />
         <CTASection />
       </main>
       <Footer />
