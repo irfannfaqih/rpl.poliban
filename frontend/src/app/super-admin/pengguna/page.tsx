@@ -267,7 +267,9 @@ export default function ManajemenPenggunaPage() {
             onValueChange={(val) => setRoleFilter(val || "all")}
           >
             <SelectTrigger className="w-[180px] bg-background h-10">
-              <SelectValue placeholder="Filter Role" />
+              <SelectValue placeholder="Filter Role">
+                {roleFilter === "all" ? "Semua Role" : ROLE_LABEL[roleFilter]}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Role</SelectItem>
