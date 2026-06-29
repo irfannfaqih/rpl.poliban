@@ -733,9 +733,15 @@ function Footer() {
               disesuaikan dengan ketentuan resmi pengelola.
             </p>
             <div className="mt-4 flex flex-col gap-2 text-xs text-muted-foreground/70">
-              <span>Kebijakan Refund</span>
-              <span>Syarat & Ketentuan</span>
-              <span>Kebijakan Privasi</span>
+              <Link href="/kebijakan-refund" className="transition-colors hover:text-foreground">
+                Kebijakan Refund
+              </Link>
+              <Link href="/syarat-ketentuan" className="transition-colors hover:text-foreground">
+                Syarat & Ketentuan
+              </Link>
+              <Link href="/kebijakan-privasi" className="transition-colors hover:text-foreground">
+                Kebijakan Privasi
+              </Link>
             </div>
           </div>
         </div>
