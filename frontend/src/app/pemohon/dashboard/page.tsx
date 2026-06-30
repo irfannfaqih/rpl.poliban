@@ -350,7 +350,7 @@ export default function DashboardPage() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 rounded-2xl bg-purple-500/10 border border-purple-500/20 p-6 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
           <div>
             <h3 className="font-semibold text-lg text-purple-700 dark:text-purple-400">
-              Jadwal Asesmen Tahap 2 (Wawancara)
+              Jadwal Asesmen Tahap 2
             </h3>
             <p className="text-sm text-muted-foreground mt-1">Sesi tanya jawab mendalam berdasarkan portofolio dan klaim Anda.</p>
             <div className="mt-4 flex flex-col sm:flex-row gap-4">
