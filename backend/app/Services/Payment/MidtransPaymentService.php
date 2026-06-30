@@ -7,7 +7,9 @@ use App\Models\Pendaftaran;
 use Illuminate\Support\Str;
 use Midtrans\Config;
 use Midtrans\Snap;
+use Midtrans\Transaction;
 use RuntimeException;
+use Throwable;
 
 class MidtransPaymentService
 {
@@ -83,6 +85,21 @@ class MidtransPaymentService
             'redirect_url' => $rawResponse['redirect_url'] ?? null,
             'raw_response' => $rawResponse,
         ];
+    }
+
+    public function fetchTransactionStatus(Payment $payment): array
+    {
+        if (! is_string($payment->order_id) || $payment->order_id === '') {
+            throw new RuntimeException('Order ID payment tidak tersedia.');
+        }
+
+        $this->configureSdk();
+
+        try {
+            return $this->normalizeResponse(Transaction::status($payment->order_id));
+        } catch (Throwable $exception) {
+            throw new RuntimeException('Gagal mengambil status transaksi Midtrans.', 0, $exception);
+        }
     }
 
     public function generateOrderId(Pendaftaran $pendaftaran): string

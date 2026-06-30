@@ -90,6 +90,16 @@ class MidtransPaymentServiceTest extends TestCase
         ]));
     }
 
+    public function test_fetch_transaction_status_requires_order_id(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Order ID payment tidak tersedia.');
+
+        (new MidtransPaymentService)->fetchTransactionStatus(new Payment([
+            'order_id' => '',
+        ]));
+    }
+
     public function test_transaction_status_mapping_handles_capture_challenge_and_standard_statuses(): void
     {
         $service = new MidtransPaymentService;

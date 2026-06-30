@@ -8,12 +8,15 @@ use App\Models\Pendaftaran;
 use App\Services\Payment\MidtransPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
 
 class PaymentController extends Controller
 {
+    private const PENDING_PAYMENT_TTL_HOURS = 24;
+
     public function show(Request $request, Pendaftaran $pendaftaran): JsonResponse
     {
         $this->authorize('update', $pendaftaran);
@@ -61,12 +64,26 @@ class PaymentController extends Controller
                 ->first();
 
             if ($pendingPayment) {
-                $locked->update([
-                    'midtrans_order_id' => $pendingPayment->order_id,
-                    'midtrans_status' => $pendingPayment->status,
-                ]);
+                $reusablePayment = $this->resolveReusablePendingPayment(
+                    $locked,
+                    $pendingPayment,
+                    $midtrans,
+                );
 
-                return $pendingPayment;
+                if ($reusablePayment) {
+                    $pendaftaranUpdates = [
+                        'midtrans_order_id' => $reusablePayment->order_id,
+                        'midtrans_status' => $reusablePayment->status,
+                    ];
+
+                    if ($reusablePayment->isPaid() && $locked->status_alur === 'waiting_payment') {
+                        $pendaftaranUpdates['status_alur'] = 'payment_verified';
+                    }
+
+                    $locked->update($pendaftaranUpdates);
+
+                    return $reusablePayment;
+                }
             }
 
             $created = true;
@@ -89,7 +106,7 @@ class PaymentController extends Controller
             return $payment;
         });
 
-        if (! $payment->snap_token) {
+        if (! $payment->snap_token && $payment->isPending()) {
             if (! $midtrans->isConfigured()) {
                 return response()->json([
                     'message' => 'Konfigurasi Midtrans belum lengkap.',
@@ -196,6 +213,112 @@ class PaymentController extends Controller
         }
 
         return response()->json($payload, 502);
+    }
+
+    private function resolveReusablePendingPayment(
+        Pendaftaran $pendaftaran,
+        Payment $payment,
+        MidtransPaymentService $midtrans,
+    ): ?Payment {
+        try {
+            $response = $midtrans->fetchTransactionStatus($payment);
+            $status = $midtrans->mapTransactionStatus(
+                $response['transaction_status'] ?? null,
+                $response['fraud_status'] ?? null,
+            );
+
+            if ($this->isReusablePaymentStatus($status)) {
+                $payment->forceFill(['raw_response' => $response])->save();
+
+                return $payment->refresh();
+            }
+
+            if ($this->isPaidStatus($status)) {
+                $payment->forceFill([
+                    'status' => $status,
+                    'paid_at' => $payment->paid_at ?? now(),
+                    'raw_response' => $response,
+                ])->save();
+
+                $pendaftaran->forceFill([
+                    'midtrans_order_id' => $payment->order_id,
+                    'midtrans_status' => $status,
+                    'status_alur' => $pendaftaran->status_alur === 'waiting_payment'
+                        ? 'payment_verified'
+                        : $pendaftaran->status_alur,
+                ])->save();
+
+                return $payment->refresh();
+            }
+
+            if ($this->isFinalNonPaidStatus($status)) {
+                $this->markPaymentFinalNonPaid($payment, $status, $response);
+
+                return null;
+            }
+
+            $payment->forceFill(['raw_response' => $response])->save();
+
+            return $payment->refresh();
+        } catch (RuntimeException) {
+            if ($this->isPendingPaymentStale($payment)) {
+                $this->markPaymentFinalNonPaid($payment, 'expire', [
+                    'status_check_failed' => true,
+                ]);
+
+                return null;
+            }
+
+            return $payment;
+        }
+    }
+
+    private function markPaymentFinalNonPaid(Payment $payment, string $status, array $response): void
+    {
+        $updates = [
+            'status' => $status,
+            'raw_response' => $response,
+        ];
+
+        if ($status === 'expire' && $payment->expired_at === null) {
+            $updates['expired_at'] = $this->parseTimestamp($response['expiry_time'] ?? null) ?? now();
+        }
+
+        $payment->forceFill($updates)->save();
+    }
+
+    private function isPendingPaymentStale(Payment $payment): bool
+    {
+        return $payment->created_at !== null
+            && $payment->created_at->lte(now()->subHours(self::PENDING_PAYMENT_TTL_HOURS));
+    }
+
+    private function isReusablePaymentStatus(string $status): bool
+    {
+        return in_array($status, ['pending', 'authorize', 'challenge'], true);
+    }
+
+    private function isPaidStatus(string $status): bool
+    {
+        return in_array($status, ['settlement', 'capture'], true);
+    }
+
+    private function isFinalNonPaidStatus(string $status): bool
+    {
+        return in_array($status, ['expire', 'cancel', 'deny', 'failure'], true);
+    }
+
+    private function parseTimestamp(mixed $value): ?Carbon
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function resolveAmount(Pendaftaran $pendaftaran): int

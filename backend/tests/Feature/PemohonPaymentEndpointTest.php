@@ -11,6 +11,7 @@ use App\Services\Payment\MidtransPaymentService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
+use RuntimeException;
 use Tests\TestCase;
 
 class PemohonPaymentEndpointTest extends TestCase
@@ -149,6 +150,168 @@ class PemohonPaymentEndpointTest extends TestCase
         $this->assertSame(1, Payment::where('pendaftaran_id', $pendaftaran->id)->count());
     }
 
+    public function test_create_payment_reuses_recent_pending_when_status_check_fails(): void
+    {
+        [$user, $pendaftaran] = $this->makePendaftaran();
+        $payment = $this->makePendingPayment($pendaftaran, [
+            'snap_token' => 'existing-snap-token',
+        ]);
+        $this->bindFakeMidtransPaymentService(statusFails: true);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/pemohon/pendaftaran/{$pendaftaran->id}/payment/create");
+
+        $response->assertOk()
+            ->assertJsonPath('data.reused', true)
+            ->assertJsonPath('data.payment.id', $payment->id)
+            ->assertJsonPath('data.payment.snap_token', 'existing-snap-token');
+
+        $this->assertSame(1, Payment::where('pendaftaran_id', $pendaftaran->id)->count());
+    }
+
+    public function test_create_payment_expires_stale_pending_when_status_check_fails(): void
+    {
+        [$user, $pendaftaran] = $this->makePendaftaran();
+        $oldPayment = $this->makePendingPayment($pendaftaran, [
+            'created_at' => now()->subHours(25),
+            'updated_at' => now()->subHours(25),
+            'snap_token' => 'expired-local-token',
+        ]);
+        $this->bindFakeMidtransPaymentService(statusFails: true);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/pemohon/pendaftaran/{$pendaftaran->id}/payment/create");
+
+        $response->assertCreated()
+            ->assertJsonPath('data.reused', false)
+            ->assertJsonPath('data.payment.status', 'pending')
+            ->assertJsonPath('data.payment.snap_token', 'fake-snap-token');
+
+        $this->assertSame(2, Payment::where('pendaftaran_id', $pendaftaran->id)->count());
+
+        $oldPayment->refresh();
+        $pendaftaran->refresh();
+        $newPayment = Payment::where('pendaftaran_id', $pendaftaran->id)
+            ->where('status', 'pending')
+            ->latest()
+            ->first();
+
+        $this->assertSame('expire', $oldPayment->status);
+        $this->assertNotNull($oldPayment->expired_at);
+        $this->assertNotNull($newPayment);
+        $this->assertSame($newPayment->order_id, $pendaftaran->midtrans_order_id);
+        $this->assertSame('pending', $pendaftaran->midtrans_status);
+        $this->assertSame('waiting_payment', $pendaftaran->status_alur);
+    }
+
+    public function test_create_payment_creates_new_payment_when_midtrans_status_is_expire(): void
+    {
+        [$user, $pendaftaran] = $this->makePendaftaran();
+        $oldPayment = $this->makePendingPayment($pendaftaran, [
+            'snap_token' => 'midtrans-expired-token',
+        ]);
+        $this->bindFakeMidtransPaymentService([
+            'transaction_status' => 'expire',
+            'fraud_status' => 'accept',
+            'expiry_time' => now()->subMinute()->toDateTimeString(),
+        ]);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/pemohon/pendaftaran/{$pendaftaran->id}/payment/create");
+
+        $response->assertCreated()
+            ->assertJsonPath('data.reused', false)
+            ->assertJsonPath('data.payment.status', 'pending')
+            ->assertJsonPath('data.payment.snap_token', 'fake-snap-token');
+
+        $oldPayment->refresh();
+        $this->assertSame('expire', $oldPayment->status);
+        $this->assertNotNull($oldPayment->expired_at);
+        $this->assertSame(2, Payment::where('pendaftaran_id', $pendaftaran->id)->count());
+    }
+
+    public function test_create_payment_reuses_pending_when_midtrans_status_is_pending(): void
+    {
+        [$user, $pendaftaran] = $this->makePendaftaran();
+        $payment = $this->makePendingPayment($pendaftaran, [
+            'created_at' => now()->subHours(25),
+            'updated_at' => now()->subHours(25),
+            'snap_token' => 'still-pending-token',
+        ]);
+        $this->bindFakeMidtransPaymentService([
+            'transaction_status' => 'pending',
+            'fraud_status' => 'accept',
+        ]);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/pemohon/pendaftaran/{$pendaftaran->id}/payment/create");
+
+        $response->assertOk()
+            ->assertJsonPath('data.reused', true)
+            ->assertJsonPath('data.payment.id', $payment->id)
+            ->assertJsonPath('data.payment.snap_token', 'still-pending-token');
+
+        $payment->refresh();
+        $this->assertSame('pending', $payment->status);
+        $this->assertSame(1, Payment::where('pendaftaran_id', $pendaftaran->id)->count());
+    }
+
+    public function test_create_payment_marks_midtrans_settlement_paid_without_creating_duplicate(): void
+    {
+        [$user, $pendaftaran] = $this->makePendaftaran();
+        $payment = $this->makePendingPayment($pendaftaran, [
+            'snap_token' => 'paid-token',
+        ]);
+        $this->bindFakeMidtransPaymentService([
+            'transaction_status' => 'settlement',
+            'fraud_status' => 'accept',
+        ]);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/pemohon/pendaftaran/{$pendaftaran->id}/payment/create");
+
+        $response->assertOk()
+            ->assertJsonPath('data.reused', true)
+            ->assertJsonPath('data.payment.id', $payment->id)
+            ->assertJsonPath('data.payment.status', 'settlement')
+            ->assertJsonPath('data.status_alur', 'payment_verified');
+
+        $payment->refresh();
+        $pendaftaran->refresh();
+        $this->assertSame('settlement', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame('payment_verified', $pendaftaran->status_alur);
+        $this->assertSame(1, Payment::where('pendaftaran_id', $pendaftaran->id)->count());
+    }
+
+    public function test_create_payment_marks_midtrans_capture_paid_without_creating_duplicate(): void
+    {
+        [$user, $pendaftaran] = $this->makePendaftaran();
+        $payment = $this->makePendingPayment($pendaftaran, [
+            'snap_token' => 'capture-token',
+        ]);
+        $this->bindFakeMidtransPaymentService([
+            'transaction_status' => 'capture',
+            'fraud_status' => 'accept',
+        ]);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/pemohon/pendaftaran/{$pendaftaran->id}/payment/create");
+
+        $response->assertOk()
+            ->assertJsonPath('data.reused', true)
+            ->assertJsonPath('data.payment.id', $payment->id)
+            ->assertJsonPath('data.payment.status', 'capture')
+            ->assertJsonPath('data.status_alur', 'payment_verified');
+
+        $payment->refresh();
+        $pendaftaran->refresh();
+        $this->assertSame('capture', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame('payment_verified', $pendaftaran->status_alur);
+        $this->assertSame(1, Payment::where('pendaftaran_id', $pendaftaran->id)->count());
+    }
+
     public function test_create_payment_returns_422_when_midtrans_config_is_missing(): void
     {
         [$user, $pendaftaran] = $this->makePendaftaran();
@@ -249,10 +412,29 @@ class PemohonPaymentEndpointTest extends TestCase
         ]);
     }
 
-    private function bindFakeMidtransPaymentService(): void
+    private function makePendingPayment(Pendaftaran $pendaftaran, array $overrides = []): Payment
     {
-        $this->app->instance(MidtransPaymentService::class, new class extends MidtransPaymentService
+        return Payment::create(array_merge([
+            'pendaftaran_id' => $pendaftaran->id,
+            'gateway' => 'midtrans',
+            'order_id' => 'SIRPL-PENDING-'.uniqid(),
+            'amount' => 2500000,
+            'currency' => 'IDR',
+            'status' => 'pending',
+        ], $overrides));
+    }
+
+    private function bindFakeMidtransPaymentService(?array $statusResponse = null, bool $statusFails = false): void
+    {
+        $this->app->instance(MidtransPaymentService::class, new class($statusResponse, $statusFails) extends MidtransPaymentService
         {
+            private int $orderCounter = 0;
+
+            public function __construct(
+                private ?array $statusResponse,
+                private bool $statusFails,
+            ) {}
+
             public function isConfigured(): bool
             {
                 return true;
@@ -260,7 +442,9 @@ class PemohonPaymentEndpointTest extends TestCase
 
             public function generateOrderId(Pendaftaran $pendaftaran): string
             {
-                return 'SIRPL-TEST-'.$pendaftaran->getKey();
+                $this->orderCounter++;
+
+                return 'SIRPL-TEST-'.$pendaftaran->getKey().'-'.$this->orderCounter;
             }
 
             public function createSnapToken(Payment $payment): array
@@ -272,6 +456,18 @@ class PemohonPaymentEndpointTest extends TestCase
                         'token' => 'fake-snap-token',
                         'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v2/vtweb/fake-snap-token',
                     ],
+                ];
+            }
+
+            public function fetchTransactionStatus(Payment $payment): array
+            {
+                if ($this->statusFails) {
+                    throw new RuntimeException('Fake Midtrans status failure.');
+                }
+
+                return $this->statusResponse ?? [
+                    'transaction_status' => 'pending',
+                    'fraud_status' => 'accept',
                 ];
             }
         });
