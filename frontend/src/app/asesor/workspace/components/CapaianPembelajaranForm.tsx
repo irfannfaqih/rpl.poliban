@@ -417,27 +417,20 @@ export default function CapaianPembelajaranForm({ tugas, onLocalChange, onRegist
                                             <Trash2 className="mr-2 h-4 w-4" />
                                             <span>Kosongkan</span>
                                           </DropdownMenuItem>
+                                          <div className="my-1 border-t border-border" />
+                                          <DropdownMenuItem onClick={() => setAllVatcValue(cpmk.id, true)} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            <span>Semua Memenuhi</span>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => setAllVatcValue(cpmk.id, false)} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
+                                            <XCircle className="mr-2 h-4 w-4" />
+                                            <span>Semua Tidak Memenuhi</span>
+                                          </DropdownMenuItem>
                                         </DropdownMenuContent>
                                       </DropdownMenu>
                                     );
                                   })}
                                 </div>
-                                <button
-                                  type="button"
-                                  disabled={isReadOnly}
-                                  onClick={() => setAllVatcValue(cpmk.id, true)}
-                                  className="h-8 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 text-[10px] font-bold text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-emerald-400"
-                                >
-                                  Semua Memenuhi
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isReadOnly}
-                                  onClick={() => setAllVatcValue(cpmk.id, false)}
-                                  className="h-8 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 text-[10px] font-bold text-red-700 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
-                                >
-                                  Semua Tidak Memenuhi
-                                </button>
                               </div>
                               {vatcIncomplete && (
                                 <p className="max-w-xs text-[10px] font-medium text-destructive">
