@@ -393,11 +393,6 @@ Route::middleware('auth:sanctum')->group(function () {
                 PemohonUjiLanjutanController::class,
                 'saveDraftJawaban',
             ]);
-            // Konfirmasi kehadiran uji lanjutan (PRD Bab 4.2 Halaman 1.6)
-            Route::post('uji-lanjutan/{id}/konfirmasi', [
-                PemohonUjiLanjutanController::class,
-                'konfirmasiKehadiran',
-            ]);
             Route::post('uji-lanjutan/{id}/reschedule', [
                 PemohonUjiLanjutanController::class,
                 'ajukanReschedule',

@@ -19,7 +19,6 @@ import {
   MapPin,
   PenLine,
   Send,
-  UserCheck,
   UserX,
   Video,
 } from "lucide-react";
@@ -49,7 +48,6 @@ export default function UjianTulisPage() {
   const ujiLanjutanQueryKey = ["pemohon", userId, "uji-lanjutan"] as const;
   const [jawaban, setJawaban] = useState<Record<number, string>>({});
   const [isMengerjakan, setIsMengerjakan] = useState(false);
-  const [showKonfirmasiModal, setShowKonfirmasiModal] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showRescheduleForm, setShowRescheduleForm] = useState(false);
   const [alasanReschedule, setAlasanReschedule] = useState("");
@@ -225,11 +223,6 @@ export default function UjianTulisPage() {
     onError: (e: any) => toast.error(e.response?.data?.message || "Gagal mengirim jawaban"),
   });
 
-  const konfirmasiMutation = useMutation({
-    mutationFn: async () => api.post(`/pemohon/uji-lanjutan/${ujian.id}/konfirmasi`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ujiLanjutanQueryKey }); setShowKonfirmasiModal(false); toast.success("Kehadiran berhasil dikonfirmasi"); },
-    onError: (e: any) => toast.error(e.response?.data?.message || "Gagal konfirmasi kehadiran"),
-  });
 
   const rescheduleMutation = useMutation({
     mutationFn: async () => api.post(`/pemohon/uji-lanjutan/${ujian.id}/reschedule`, { alasan: alasanReschedule }),
@@ -432,28 +425,6 @@ export default function UjianTulisPage() {
   // ═══ MODE NORMAL (Pra-ujian / Sudah selesai) ═══
   return (
     <>
-      {/* Modal Konfirmasi Kehadiran */}
-      <AnimatePresence>
-        {showKonfirmasiModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-background border rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 space-y-5">
-              <div className="flex items-start gap-4">
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"><UserCheck className="h-6 w-6 text-primary" /></div>
-                <div><h3 className="font-bold text-lg">Konfirmasi Kehadiran</h3><p className="text-sm text-muted-foreground mt-1 leading-relaxed">Anda akan mengkonfirmasi kehadiran untuk AT2 ini. Asesor akan mendapat notifikasi.</p></div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setShowKonfirmasiModal(false)} disabled={konfirmasiMutation.isPending}>Batal</Button>
-                <Button onClick={() => konfirmasiMutation.mutate()} disabled={konfirmasiMutation.isPending} className="gap-2">
-                  {konfirmasiMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}Ya, Konfirmasi
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Modal Submit */}
       <AnimatePresence>
         {showSubmitModal && (
@@ -543,21 +514,6 @@ export default function UjianTulisPage() {
                 </div>
               )}
             </div>
-
-            {/* Konfirmasi kehadiran */}
-            {!sudahDikirim && (
-              ujian.konfirmasi_kehadiran ? (
-                <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-4 py-3">
-                  <UserCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Kehadiran sudah dikonfirmasi</span>
-                </div>
-              ) : (
-                <Button onClick={() => setShowKonfirmasiModal(true)} variant="outline"
-                  className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5 font-semibold h-10">
-                  <UserCheck className="h-4 w-4" /> Konfirmasi Kehadiran Saya
-                </Button>
-              )
-            )}
           </div>
         )}
 

@@ -132,7 +132,7 @@ class PhaseOneRemediationFeatureTest extends TestCase
         );
     }
 
-    public function test_duplicate_attendance_and_reschedule_requests_are_rejected(): void
+    public function test_duplicate_reschedule_requests_are_rejected(): void
     {
         [, , $pendaftaran, , $pemohon] = $this->baseWorkflow('asesmen_tahap2');
         $uji = UjiLanjutan::create([
@@ -143,19 +143,6 @@ class PhaseOneRemediationFeatureTest extends TestCase
             'durasi_menit' => 60,
         ]);
         $controller = app(PemohonUjiLanjutanController::class);
-        $controller->konfirmasiKehadiran(
-            $this->requestAs($pemohon),
-            $uji->id,
-        );
-        try {
-            $controller->konfirmasiKehadiran(
-                $this->requestAs($pemohon),
-                $uji->id,
-            );
-            $this->fail('Konfirmasi kedua seharusnya ditolak.');
-        } catch (HttpException $e) {
-            $this->assertSame(409, $e->getStatusCode());
-        }
 
         $controller->ajukanReschedule(
             $this->requestAs($pemohon, [
@@ -690,8 +677,6 @@ class PhaseOneRemediationFeatureTest extends TestCase
             $table->date('tanggal_ujian')->nullable();
             $table->string('waktu_ujian')->nullable();
             $table->unsignedInteger('durasi_menit')->nullable();
-            $table->boolean('konfirmasi_kehadiran')->default(false);
-            $table->timestamp('konfirmasi_at')->nullable();
             $table->timestamp('ujian_dimulai_at')->nullable();
             $table->string('reschedule_status')->nullable();
             $table->text('reschedule_alasan')->nullable();

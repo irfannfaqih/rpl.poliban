@@ -27,8 +27,6 @@ class UjiLanjutan extends Model
         "tempat",
         "link_meeting",
         "nilai_at2_final",
-        "konfirmasi_kehadiran",
-        "konfirmasi_at",
         "ujian_dimulai_at",
         "reschedule_status",
         "reschedule_alasan",
@@ -40,8 +38,6 @@ class UjiLanjutan extends Model
     {
         return [
             "tanggal_ujian"        => "date",
-            "konfirmasi_kehadiran" => "boolean",
-            "konfirmasi_at"        => "datetime",
             "instrumen_updated_at" => "datetime",
             "dijadwalkan_at"       => "datetime",
             "ujian_dimulai_at"     => "datetime",

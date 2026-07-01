@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\Pemohon;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\Pendaftaran;
-use App\Models\PenugasanAsesor;
 use App\Models\UjiLanjutan;
 use App\Models\UjiLanjutanItem;
 use Illuminate\Http\JsonResponse;
@@ -40,8 +39,6 @@ class UjiLanjutanController extends Controller
             'tempat',
             'link_meeting',
             'nilai_at2_final',
-            'konfirmasi_kehadiran',
-            'konfirmasi_at',
             'ujian_dimulai_at',
             'reschedule_status',
             'reschedule_alasan',
@@ -293,62 +290,6 @@ class UjiLanjutanController extends Controller
         });
 
         return response()->json(["message" => "Draft jawaban tersimpan", "saved_at" => now()->toIso8601String()]);
-    }
-
-    // ─── Konfirmasi Kehadiran ─────────────────────────────────────────────────
-
-    public function konfirmasiKehadiran(Request $request, $id): JsonResponse
-    {
-        $userId = $request->user()->id;
-
-        $ujiLanjutan = UjiLanjutan::where("id", $id)
-            ->whereHas("pendaftaran", fn($q) => $q->where("user_id", $userId))
-            ->firstOrFail();
-
-        $ujiLanjutan = DB::transaction(function () use (
-            $ujiLanjutan,
-            $userId,
-        ) {
-            [, $locked] = $this->lockActiveUjian(
-                $ujiLanjutan->id,
-                $userId,
-            );
-            abort_unless($locked->tanggal_ujian, 422, 'Jadwal belum ditetapkan.');
-            abort_if(
-                in_array($locked->fase_tulis, ["selesai", "tidak_hadir"], true),
-                409,
-                'AT2 sudah selesai atau pemohon dinyatakan tidak hadir.',
-            );
-            abort_if(
-                $locked->konfirmasi_kehadiran,
-                409,
-                'Kehadiran sudah dikonfirmasi sebelumnya.',
-            );
-            $locked->update([
-                "konfirmasi_kehadiran" => true,
-                "konfirmasi_at" => now(),
-            ]);
-
-            return $locked->fresh();
-        });
-
-        $asesorIds = PenugasanAsesor::where("pendaftaran_id", $ujiLanjutan->pendaftaran_id)
-            ->pluck("asesor_id");
-
-        foreach ($asesorIds as $asesorId) {
-            Notification::create([
-                "user_id" => $asesorId,
-                "title"   => "Pemohon Konfirmasi Kehadiran AT2",
-                "message" => "Pemohon telah mengkonfirmasi kehadiran untuk Asesmen Tahap 2.",
-                "type"    => "info",
-                "href"    => "/asesor/asesmen-tahap-2",
-            ]);
-        }
-
-        return response()->json([
-            "message" => "Kehadiran berhasil dikonfirmasi.",
-            "data"    => $ujiLanjutan->fresh(),
-        ]);
     }
 
     // ─── Ajukan Reschedule ────────────────────────────────────────────────────
