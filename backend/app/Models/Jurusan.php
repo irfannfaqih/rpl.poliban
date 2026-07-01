@@ -7,7 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class Jurusan extends Model
 {
     protected $table = 'jurusan';
-    protected $fillable = ['nama_jurusan'];
+    protected $fillable = [
+        'nama_jurusan',
+        'ketua_jurusan_nama',
+        'ketua_jurusan_nip',
+    ];
 
     public function prodi()
     {

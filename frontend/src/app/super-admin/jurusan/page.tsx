@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { 
-  Building2, 
   Plus, 
   Search, 
   Edit, 
@@ -13,7 +12,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -24,9 +22,21 @@ import {
 } from "@/components/ui/dialog";
 import api from "@/lib/api";
 
+type ApiError = { response?: { status?: number; data?: { message?: string; errors?: Record<string, string[]> } } };
+
+const getApiError = (error: unknown): ApiError => error as ApiError;
+
 interface Jurusan {
   id: number;
   nama_jurusan: string;
+  ketua_jurusan_nama?: string | null;
+  ketua_jurusan_nip?: string | null;
+}
+
+interface JurusanFormPayload {
+  nama_jurusan: string;
+  ketua_jurusan_nama: string | null;
+  ketua_jurusan_nip: string | null;
 }
 
 export default function ManajemenJurusanPage() {
@@ -40,6 +50,8 @@ export default function ManajemenJurusanPage() {
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
   const formNama = useRef<HTMLInputElement>(null);
+  const formKetuaJurusanNama = useRef<HTMLInputElement>(null);
+  const formKetuaJurusanNip = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
@@ -65,13 +77,14 @@ export default function ManajemenJurusanPage() {
       setDeleteTarget(null);
       queryClient.invalidateQueries({ queryKey: ['jurusan'] });
     },
-    onError: (err: any) => {
+    onError: (error: unknown) => {
+      const err = getApiError(error);
       toast.error(err.response?.data?.message || 'Gagal menghapus jurusan');
     }
   });
 
   const saveMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: JurusanFormPayload) => {
       if (editTarget) {
         await api.put(`/super-admin/jurusan/${editTarget.id}`, payload);
       } else {
@@ -83,9 +96,10 @@ export default function ManajemenJurusanPage() {
       setIsFormModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ['jurusan'] });
     },
-    onError: (err: any) => {
+    onError: (error: unknown) => {
+      const err = getApiError(error);
       if (err.response?.status === 422) {
-        setErrors(err.response.data.errors || {});
+        setErrors(err.response?.data?.errors || {});
       } else {
         toast.error(err.response?.data?.message || 'Gagal menyimpan jurusan');
       }
@@ -102,6 +116,8 @@ export default function ManajemenJurusanPage() {
   const handleSave = () => {
     const payload = {
       nama_jurusan: formNama.current?.value || '',
+      ketua_jurusan_nama: formKetuaJurusanNama.current?.value || null,
+      ketua_jurusan_nip: formKetuaJurusanNip.current?.value || null,
     };
 
     const newErrors: Record<string, string[]> = {};
@@ -143,19 +159,24 @@ export default function ManajemenJurusanPage() {
               <tr>
                 <th className="px-6 py-4 font-semibold w-16 text-center">ID</th>
                 <th className="px-6 py-4 font-semibold">Nama Jurusan</th>
+                <th className="px-6 py-4 font-semibold">Ketua Jurusan</th>
                 <th className="px-6 py-4 font-semibold text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {loading ? (
-                <tr><td colSpan={3} className="px-6 py-12 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />Memuat data...</td></tr>
+                <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />Memuat data...</td></tr>
               ) : filteredData.length === 0 ? (
-                <tr><td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">Tidak ada data ditemukan.</td></tr>
+                <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Tidak ada data ditemukan.</td></tr>
               ) : (
                 filteredData.map((j) => (
                   <tr key={j.id} className="hover:bg-muted/10 transition-colors">
                     <td className="px-6 py-4 text-center text-muted-foreground">{j.id}</td>
                     <td className="px-6 py-4 font-medium text-foreground">{j.nama_jurusan}</td>
+                    <td className="px-6 py-4 text-muted-foreground">
+                      <div>{j.ketua_jurusan_nama || "-"}</div>
+                      <div className="text-xs">NIP {j.ketua_jurusan_nip || "-"}</div>
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => handleOpenEdit(j)} className="h-8 gap-1.5"><Edit className="h-3.5 w-3.5" /> Edit</Button>
@@ -172,11 +193,11 @@ export default function ManajemenJurusanPage() {
 
       {/* Form Modal */}
       <Dialog open={isFormModalOpen} onOpenChange={setIsFormModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>{editTarget ? "Edit Jurusan" : "Tambah Jurusan"}</DialogTitle>
             <DialogDescription>
-              {editTarget ? "Ubah nama jurusan." : "Masukkan nama jurusan baru."}
+              {editTarget ? "Ubah data jurusan dan ketua jurusan." : "Masukkan data jurusan baru."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -184,6 +205,16 @@ export default function ManajemenJurusanPage() {
               <label className="text-sm font-medium">Nama Jurusan <span className="text-red-500">*</span></label>
               <Input ref={formNama} defaultValue={editTarget?.nama_jurusan} placeholder="e.g. Teknik Sipil" className={errors.nama_jurusan ? "border-red-500" : ""} />
               {errors.nama_jurusan && <p className="text-[10px] text-red-500">{errors.nama_jurusan[0]}</p>}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nama Ketua Jurusan</label>
+              <Input ref={formKetuaJurusanNama} defaultValue={editTarget?.ketua_jurusan_nama || ""} placeholder="Nama lengkap Ketua Jurusan" className={errors.ketua_jurusan_nama ? "border-red-500" : ""} />
+              {errors.ketua_jurusan_nama && <p className="text-[10px] text-red-500">{errors.ketua_jurusan_nama[0]}</p>}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">NIP Ketua Jurusan</label>
+              <Input ref={formKetuaJurusanNip} defaultValue={editTarget?.ketua_jurusan_nip || ""} placeholder="NIP Ketua Jurusan" className={errors.ketua_jurusan_nip ? "border-red-500" : ""} />
+              {errors.ketua_jurusan_nip && <p className="text-[10px] text-red-500">{errors.ketua_jurusan_nip[0]}</p>}
             </div>
           </div>
           <DialogFooter>

@@ -34,6 +34,8 @@ class ProdiController extends Controller
             'jenjang' => 'required|in:D3,D4',
             'jurusan' => 'sometimes|string|max:100',
             'jurusan_id' => 'required|exists:jurusan,id',
+            'koordinator_prodi_nama' => 'nullable|string|max:255',
+            'koordinator_prodi_nip' => 'nullable|string|max:50',
             'status' => 'sometimes|in:aktif,nonaktif',
         ]);
 
@@ -58,6 +60,8 @@ class ProdiController extends Controller
             'jenjang' => 'sometimes|in:D3,D4',
             'jurusan' => 'sometimes|string|max:100',
             'jurusan_id' => 'sometimes|exists:jurusan,id',
+            'koordinator_prodi_nama' => 'nullable|string|max:255',
+            'koordinator_prodi_nip' => 'nullable|string|max:50',
             'status' => 'sometimes|in:aktif,nonaktif',
         ]);
 

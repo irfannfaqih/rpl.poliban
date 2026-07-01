@@ -2,14 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { 
-  Building2, 
   Plus, 
   Search, 
   Edit, 
   Trash2, 
   CheckCircle2,
   XCircle,
-  Power,
   AlertCircle,
   Loader2
 } from "lucide-react";
@@ -28,6 +26,19 @@ import {
 } from "@/components/ui/dialog";
 import api from "@/lib/api";
 
+type ApiError = { response?: { status?: number; data?: { message?: string; errors?: Record<string, string[]> } } };
+
+const getApiError = (error: unknown): ApiError => error as ApiError;
+
+interface ProdiFormPayload {
+  kode: string;
+  nama: string;
+  jurusan_id: number | null;
+  jenjang: string;
+  koordinator_prodi_nama: string | null;
+  koordinator_prodi_nip: string | null;
+}
+
 interface Prodi {
   id: number;
   kode: string;
@@ -36,6 +47,8 @@ interface Prodi {
   jurusan: string;
   jurusan_id: number;
   jurusan_data?: { id: number; nama_jurusan: string };
+  koordinator_prodi_nama?: string | null;
+  koordinator_prodi_nip?: string | null;
   status: string;
   pendaftaran_count: number;
 }
@@ -54,6 +67,8 @@ export default function ManajemenProdiPage() {
   const formNama = useRef<HTMLInputElement>(null);
   const formJurusan = useRef<HTMLSelectElement>(null);
   const formJenjang = useRef<HTMLSelectElement>(null);
+  const formKoordinatorNama = useRef<HTMLInputElement>(null);
+  const formKoordinatorNip = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
@@ -89,7 +104,8 @@ export default function ManajemenProdiPage() {
       setDeleteTarget(null);
       queryClient.invalidateQueries({ queryKey: ['prodi'] });
     },
-    onError: (err: any) => {
+    onError: (error: unknown) => {
+      const err = getApiError(error);
       toast.error(err.response?.data?.message || 'Gagal menghapus prodi');
     }
   });
@@ -102,13 +118,14 @@ export default function ManajemenProdiPage() {
       toast.success('Status prodi berhasil diubah');
       queryClient.invalidateQueries({ queryKey: ['prodi'] });
     },
-    onError: (err: any) => {
+    onError: (error: unknown) => {
+      const err = getApiError(error);
       toast.error(err.response?.data?.message || 'Gagal mengubah status');
     }
   });
 
   const saveMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: ProdiFormPayload) => {
       if (editTarget) {
         await api.put(`/super-admin/prodi/${editTarget.id}`, payload);
       } else {
@@ -120,9 +137,10 @@ export default function ManajemenProdiPage() {
       setIsFormModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ['prodi'] });
     },
-    onError: (err: any) => {
+    onError: (error: unknown) => {
+      const err = getApiError(error);
       if (err.response?.status === 422) {
-        setErrors(err.response.data.errors || {});
+        setErrors(err.response?.data?.errors || {});
       } else {
         toast.error(err.response?.data?.message || 'Gagal menyimpan prodi');
       }
@@ -146,6 +164,8 @@ export default function ManajemenProdiPage() {
       nama: formNama.current?.value || '',
       jurusan_id: formJurusan.current?.value ? parseInt(formJurusan.current.value) : null,
       jenjang: formJenjang.current?.value || 'D3',
+      koordinator_prodi_nama: formKoordinatorNama.current?.value || null,
+      koordinator_prodi_nip: formKoordinatorNip.current?.value || null,
     };
 
     const newErrors: Record<string, string[]> = {};
@@ -188,6 +208,7 @@ export default function ManajemenProdiPage() {
                 <th className="px-6 py-4 font-semibold">Kode Prodi</th>
                 <th className="px-6 py-4 font-semibold">Nama Program Studi</th>
                 <th className="px-6 py-4 font-semibold">Jurusan</th>
+                <th className="px-6 py-4 font-semibold">Koordinator Prodi</th>
                 <th className="px-6 py-4 font-semibold text-center">Jenjang</th>
                 <th className="px-6 py-4 font-semibold text-center">Status</th>
                 <th className="px-6 py-4 font-semibold text-center">Pendaftar</th>
@@ -196,15 +217,19 @@ export default function ManajemenProdiPage() {
             </thead>
             <tbody className="divide-y">
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />Memuat data...</td></tr>
+                <tr><td colSpan={8} className="px-6 py-12 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />Memuat data...</td></tr>
               ) : data.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Tidak ada data ditemukan.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-8 text-center text-muted-foreground">Tidak ada data ditemukan.</td></tr>
               ) : (
                 data.map((p) => (
                   <tr key={p.id} className="hover:bg-muted/10 transition-colors">
                     <td className="px-6 py-4 font-medium font-mono text-foreground">{p.kode}</td>
                     <td className="px-6 py-4 font-medium">{p.nama}</td>
                     <td className="px-6 py-4 text-muted-foreground">{p.jurusan_data?.nama_jurusan || p.jurusan}</td>
+                    <td className="px-6 py-4 text-muted-foreground">
+                      <div>{p.koordinator_prodi_nama || "-"}</div>
+                      <div className="text-xs">NIP {p.koordinator_prodi_nip || "-"}</div>
+                    </td>
                     <td className="px-6 py-4 text-center">
                       <Badge variant="secondary" className="font-mono">{p.jenjang}</Badge>
                     </td>
@@ -307,6 +332,30 @@ export default function ManajemenProdiPage() {
                   ))}
                 </select>
                 {errors.jurusan_id && errors.jurusan_id.length > 0 && <p className="text-[10px] text-red-500">{errors.jurusan_id[0]}</p>}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className={`text-xs font-bold uppercase tracking-wider ${errors.koordinator_prodi_nama ? 'text-red-500' : 'text-muted-foreground'}`}>Nama Koordinator Prodi</label>
+                  <Input
+                    ref={formKoordinatorNama}
+                    defaultValue={editTarget?.koordinator_prodi_nama || ""}
+                    placeholder="Nama lengkap Koordinator Prodi"
+                    className={errors.koordinator_prodi_nama ? "border-red-500 focus-visible:ring-red-500" : ""}
+                    onChange={() => setErrors(prev => ({ ...prev, koordinator_prodi_nama: [] }))}
+                  />
+                  {errors.koordinator_prodi_nama && errors.koordinator_prodi_nama.length > 0 && <p className="text-[10px] text-red-500">{errors.koordinator_prodi_nama[0]}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <label className={`text-xs font-bold uppercase tracking-wider ${errors.koordinator_prodi_nip ? 'text-red-500' : 'text-muted-foreground'}`}>NIP Koordinator Prodi</label>
+                  <Input
+                    ref={formKoordinatorNip}
+                    defaultValue={editTarget?.koordinator_prodi_nip || ""}
+                    placeholder="NIP Koordinator Prodi"
+                    className={errors.koordinator_prodi_nip ? "border-red-500 focus-visible:ring-red-500" : ""}
+                    onChange={() => setErrors(prev => ({ ...prev, koordinator_prodi_nip: [] }))}
+                  />
+                  {errors.koordinator_prodi_nip && errors.koordinator_prodi_nip.length > 0 && <p className="text-[10px] text-red-500">{errors.koordinator_prodi_nip[0]}</p>}
+                </div>
               </div>
             </div>
             <div className="p-6 border-t bg-muted/20 flex justify-end gap-3 shrink-0">

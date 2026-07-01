@@ -9,7 +9,8 @@ class Prodi extends Model
     protected $table = 'prodi';
 
     protected $fillable = [
-        'kode', 'nama', 'jenjang', 'jurusan', 'jurusan_id', 'status',
+        'kode', 'nama', 'jenjang', 'jurusan', 'jurusan_id',
+        'koordinator_prodi_nama', 'koordinator_prodi_nip', 'status',
     ];
 
     public function jurusanData()

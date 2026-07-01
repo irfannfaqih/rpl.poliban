@@ -70,10 +70,11 @@
         ? 'Ruang Rapat Jurusan '.$jurusan.' Politeknik Negeri Banjarmasin'
         : 'Ruang Rapat Politeknik Negeri Banjarmasin';
     $pesertaLulus = ($f19PendaftarLulus ?? collect())->values();
-    $koordinator = $approval?->kaprodiApprover?->nama ?? '................................';
-    $ketuaJurusan = '................................';
-    $nipKetuaJurusan = '-';
-    $nipKoordinator = '-';
+    $ketuaJurusan = $prodi?->jurusanData?->ketua_jurusan_nama ?: '................................';
+    $nipKetuaJurusan = $prodi?->jurusanData?->ketua_jurusan_nip ?: '-';
+    $koordinator = $prodi?->koordinator_prodi_nama
+        ?: ($approval?->kaprodiApprover?->nama ?: '................................');
+    $nipKoordinator = $prodi?->koordinator_prodi_nip ?: '-';
 @endphp
 
 <div class="judul-utama">
