@@ -86,7 +86,7 @@ class PdfService
 
         // F19 - Berita Acara Asesmen
         'F19' => [
-            'dataDiri', 'prodi', 'penugasanAsesor.asesor', 'ujiLanjutan',
+            'user:id,nama', 'dataDiri', 'prodi.jurusanData', 'penugasanAsesor.asesor', 'ujiLanjutan',
             'plenoApproval.kaprodiApprover', 'plenoApproval.pimpinanApprover',
         ],
 
@@ -219,6 +219,10 @@ class PdfService
         ];
 
         // ── 4. Tentukan view ────────────────────────────────────────────────────
+        if ($documentId === 'F19') {
+            $data['f19PendaftarLulus'] = collect([$pendaftaran]);
+        }
+
         $viewMap = [
             'F01' => 'pdf.f01', 'F02' => 'pdf.f02', 'F03' => 'pdf.f03',
             'F04' => 'pdf.f04', 'F05' => 'pdf.f05', 'F06' => 'pdf.f06',

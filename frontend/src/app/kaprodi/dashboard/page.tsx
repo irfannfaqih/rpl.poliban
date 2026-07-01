@@ -7,17 +7,29 @@ import {
 } from "@/lib/pleno-approval-status";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Clock3, ClipboardCheck, Loader2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock3, ClipboardCheck, Loader2, XCircle, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
-function countByStatus(items: any[], statuses: string[]) {
+type Approval = {
+  id: number;
+  status: string;
+  pendaftaran_id: number;
+  submitted_at?: string | null;
+  updated_at?: string | null;
+  pendaftaran?: {
+    nomor_pendaftaran?: string | null;
+    user?: { nama?: string | null } | null;
+  } | null;
+};
+
+function countByStatus(items: Approval[], statuses: string[]) {
   return items.filter((item) => statuses.includes(item.status)).length;
 }
 
 export default function KaprodiDashboardPage() {
   const user = useAuthStore((state) => state.user);
 
-  const { data: approvals = [], isLoading, error } = useQuery({
+  const { data: approvals = [], isLoading, error } = useQuery<Approval[]>({
     queryKey: ["kaprodi-dashboard-approvals"],
     queryFn: async () => {
       const { data } = await api.get("/kaprodi/pleno-approvals", {
@@ -54,19 +66,18 @@ export default function KaprodiDashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-8 pb-20">
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">Dashboard Kaprodi</p>
-        <h1 className="mt-2 text-2xl font-black tracking-tight">Ringkasan Approval Pleno</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Data dibatasi untuk prodi yang dipimpin: <span className="font-semibold">{user?.prodi?.nama || "Prodi belum terhubung"}</span>.
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Dashboard Kaprodi</h1>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ringkasan approval pleno untuk prodi yang dipimpin: <span className="font-semibold">{user?.prodi?.nama || "Prodi belum terhubung"}</span>.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <SummaryCard title="Menunggu" value={waiting} icon={Clock3} className="text-amber-600 bg-amber-50 border-amber-100" />
-        <SummaryCard title="Diteruskan" value={forwarded} icon={ClipboardCheck} className="text-blue-600 bg-blue-50 border-blue-100" />
-        <SummaryCard title="Final" value={finalApproved} icon={CheckCircle2} className="text-emerald-600 bg-emerald-50 border-emerald-100" />
-        <SummaryCard title="Ditolak" value={rejected} icon={XCircle} className="text-red-600 bg-red-50 border-red-100" />
+        <SummaryCard title="Menunggu" value={waiting} icon={Clock3} tone="text-amber-600 dark:text-amber-500" />
+        <SummaryCard title="Diteruskan" value={forwarded} icon={ClipboardCheck} tone="text-blue-600 dark:text-blue-500" />
+        <SummaryCard title="Final" value={finalApproved} icon={CheckCircle2} tone="text-emerald-600 dark:text-emerald-500" />
+        <SummaryCard title="Ditolak" value={rejected} icon={XCircle} tone="text-red-600 dark:text-red-500" />
       </div>
 
       <div className="rounded-2xl border bg-card shadow-sm">
@@ -90,7 +101,7 @@ export default function KaprodiDashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {latest.map((approval: any) => (
+              {latest.map((approval) => (
                 <tr key={approval.id} className="hover:bg-muted/10">
                   <td className="px-5 py-4 font-semibold">{approval.pendaftaran?.user?.nama || "-"}</td>
                   <td className="px-5 py-4 text-xs text-muted-foreground">{approval.pendaftaran?.nomor_pendaftaran || `RPL-${approval.pendaftaran_id}`}</td>
@@ -113,14 +124,14 @@ export default function KaprodiDashboardPage() {
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, className }: { title: string; value: number; icon: any; className: string }) {
+function SummaryCard({ title, value, icon: Icon, tone }: { title: string; value: number; icon: LucideIcon; tone: string }) {
   return (
-    <div className={`rounded-2xl border p-5 shadow-sm ${className}`}>
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-bold">{title}</p>
-        <Icon className="h-6 w-6 opacity-70" />
+    <div className="rounded-2xl border bg-card p-6 shadow-sm">
+      <div className="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        <Icon className={`h-4 w-4 ${tone}`} />
+        {title}
       </div>
-      <p className="mt-4 text-3xl font-black">{value}</p>
+      <p className={`text-2xl font-bold ${tone}`}>{value}</p>
     </div>
   );
 }
