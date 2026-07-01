@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ProdiSeeder::class,
+            AcademicOfficialTemplateSeeder::class,
             GelombangSeeder::class,
             UserSeeder::class,
             KurikulumSeeder::class,
