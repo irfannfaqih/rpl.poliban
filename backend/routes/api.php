@@ -389,6 +389,10 @@ Route::middleware('auth:sanctum')->group(function () {
                 PemohonUjiLanjutanController::class,
                 'submitJawaban',
             ]);
+            Route::post('uji-lanjutan/{id}/timeout-submit', [
+                PemohonUjiLanjutanController::class,
+                'timeoutSubmit',
+            ]);
             Route::patch('uji-lanjutan/{id}/draft', [
                 PemohonUjiLanjutanController::class,
                 'saveDraftJawaban',

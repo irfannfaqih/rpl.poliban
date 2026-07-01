@@ -22,7 +22,7 @@ import {
   UserX,
   Video,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 // ─── Countdown hook ───────────────────────────────────────────────────────────
@@ -45,7 +45,10 @@ export default function UjianTulisPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const userId = useAuthStore((state) => state.user?.id);
-  const ujiLanjutanQueryKey = ["pemohon", userId, "uji-lanjutan"] as const;
+  const ujiLanjutanQueryKey = useMemo(
+    () => ["pemohon", userId, "uji-lanjutan"] as const,
+    [userId],
+  );
   const [jawaban, setJawaban] = useState<Record<number, string>>({});
   const [isMengerjakan, setIsMengerjakan] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -56,6 +59,7 @@ export default function UjianTulisPage() {
   const jawabanRef = useRef<Record<number, string>>({});
   const dirtyIdsRef = useRef<Set<number>>(new Set());
   const autosaveInFlightRef = useRef(false);
+  const timeoutSubmitInFlightRef = useRef(false);
 
   const { data: ujian, isLoading, isError, refetch } = useQuery({
     queryKey: ujiLanjutanQueryKey,
@@ -76,7 +80,7 @@ export default function UjianTulisPage() {
   });
 
   const fase = ujian?.fase_tulis;
-  const soalList = ujian?.items || [];
+  const soalList = useMemo(() => ujian?.items || [], [ujian?.items]);
   const adaC3 = soalList.length > 0;
   const sudahDikirim = fase === "koreksi" || fase === "selesai";
   const isTidakHadir = fase === "tidak_hadir";
@@ -113,9 +117,9 @@ export default function UjianTulisPage() {
 
   // Simpan ke localStorage setiap kali jawaban berubah (instant, offline-safe)
   useEffect(() => {
+    jawabanRef.current = jawaban;
     if (!localKey || Object.keys(jawaban).length === 0) return;
     localStorage.setItem(localKey, JSON.stringify(jawaban));
-    jawabanRef.current = jawaban;
   }, [jawaban, localKey]);
 
   const saveDirtyDraft = useCallback(async () => {
@@ -171,9 +175,39 @@ export default function UjianTulisPage() {
   }, [dalamWindow, fase, saveDirtyDraft, ujian?.id]);
 
   // Bersihkan localStorage setelah submit berhasil
-  const clearLocalDraft = () => {
+  const clearLocalDraft = useCallback(() => {
     if (localKey) localStorage.removeItem(localKey);
-  };
+  }, [localKey]);
+
+  const finalizeExpiredSession = useCallback(async () => {
+    if (!ujian?.id || fase !== "menunggu_jawaban" || timeoutSubmitInFlightRef.current) {
+      return;
+    }
+
+    timeoutSubmitInFlightRef.current = true;
+    try {
+      await saveDirtyDraft();
+      const payload = soalList.map((s: { id: number; jawaban_pemohon?: string | null }) => ({
+        id: s.id,
+        jawaban_pemohon: jawabanRef.current[s.id] ?? s.jawaban_pemohon ?? "",
+      }));
+      await api.post(`/pemohon/uji-lanjutan/${ujian.id}/timeout-submit`, {
+        jawaban: payload,
+      });
+      dirtyIdsRef.current.clear();
+      clearLocalDraft();
+      await queryClient.invalidateQueries({ queryKey: ujiLanjutanQueryKey });
+      await refetch();
+      setIsMengerjakan(false);
+      toast.info("Waktu habis. Jawaban yang sudah tersimpan otomatis dikirim.");
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      toast.error(apiError.response?.data?.message || "Gagal memfinalisasi jawaban setelah waktu habis.");
+      void refetch();
+    } finally {
+      timeoutSubmitInFlightRef.current = false;
+    }
+  }, [clearLocalDraft, fase, queryClient, refetch, saveDirtyDraft, soalList, ujian?.id, ujiLanjutanQueryKey]);
 
   useEffect(() => {
     setWaktuHabis(
@@ -183,8 +217,8 @@ export default function UjianTulisPage() {
 
   const handleCountdownExpire = useCallback(() => {
     setWaktuHabis(true);
-    void refetch();
-  }, [refetch]);
+    void finalizeExpiredSession();
+  }, [finalizeExpiredSession]);
 
   const handleJawabanChange = useCallback((id: number, value: string) => {
     dirtyIdsRef.current.add(id);

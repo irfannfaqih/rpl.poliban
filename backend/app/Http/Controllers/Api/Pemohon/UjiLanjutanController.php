@@ -7,6 +7,7 @@ use App\Models\Notification;
 use App\Models\Pendaftaran;
 use App\Models\UjiLanjutan;
 use App\Models\UjiLanjutanItem;
+use App\Services\At2ExpiredAutoSubmitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -200,6 +201,55 @@ class UjiLanjutanController extends Controller
         });
 
         return response()->json(["message" => "Jawaban berhasil dikirim"]);
+    }
+
+    public function timeoutSubmit(
+        Request $request,
+        $id,
+        At2ExpiredAutoSubmitService $autoSubmitService,
+    ): JsonResponse {
+        $userId = $request->user()->id;
+
+        $ujiLanjutan = UjiLanjutan::where("id", $id)
+            ->whereHas("pendaftaran", fn($q) => $q->where("user_id", $userId))
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            "jawaban" => "sometimes|array",
+            "jawaban.*.id" => [
+                "required",
+                "distinct",
+                Rule::exists("uji_lanjutan_item", "id")->where(
+                    fn ($query) => $query
+                        ->where("uji_lanjutan_id", $ujiLanjutan->id)
+                        ->where("tipe", "c3"),
+                ),
+            ],
+            "jawaban.*.jawaban_pemohon" => "nullable|string",
+        ]);
+
+        $outcome = $autoSubmitService->finalizeOwnedExpired(
+            $ujiLanjutan->id,
+            $userId,
+            $validated["jawaban"] ?? [],
+        );
+
+        if ($outcome === At2ExpiredAutoSubmitService::OUTCOME_NOT_EXPIRED) {
+            abort(409, "Waktu pengerjaan belum berakhir.");
+        }
+
+        if ($outcome === At2ExpiredAutoSubmitService::OUTCOME_SKIPPED) {
+            abort(409, "Sesi AT2 tidak dapat difinalisasi otomatis.");
+        }
+
+        return response()->json([
+            "message" => $outcome === At2ExpiredAutoSubmitService::OUTCOME_PROCESSED
+                ? "Waktu habis. Jawaban yang sudah tersimpan otomatis dikirim."
+                : "Sesi AT2 sudah difinalisasi.",
+            "data" => [
+                "outcome" => $outcome,
+            ],
+        ]);
     }
 
     // ─── Save Draft Jawaban (auto-save, tidak final) ──────────────────────────

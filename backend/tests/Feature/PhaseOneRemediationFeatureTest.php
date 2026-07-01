@@ -22,6 +22,7 @@ use App\Services\PendaftaranService;
 use App\Services\PrivateDocumentStorage;
 use App\Services\QrCodeService;
 use App\Services\RegistrationEligibilityService;
+use App\Services\At2ExpiredAutoSubmitService;
 use App\Services\SkDocumentService;
 use App\Services\SkSnapshotService;
 use Illuminate\Database\Schema\Blueprint;
@@ -130,6 +131,101 @@ class PhaseOneRemediationFeatureTest extends TestCase
             ]),
             $uji->id,
         );
+    }
+
+    public function test_expired_at2_with_partial_answers_is_auto_submitted_for_correction(): void
+    {
+        [, , $pendaftaran] = $this->baseWorkflow('asesmen_tahap2');
+        [$uji, $answered, $empty] = $this->expiredWrittenAt2($pendaftaran);
+        $answered->update(['jawaban_pemohon' => 'Jawaban tersimpan']);
+
+        $result = app(At2ExpiredAutoSubmitService::class)->finalizeExpired();
+
+        $this->assertSame(1, $result['processed']);
+        $this->assertSame('koreksi', $uji->fresh()->fase_tulis);
+        $this->assertSame('Jawaban tersimpan', $answered->fresh()->jawaban_pemohon);
+        $this->assertNull($empty->fresh()->jawaban_pemohon);
+        $this->assertNotNull($answered->fresh()->submitted_at);
+        $this->assertNotNull($empty->fresh()->submitted_at);
+    }
+
+    public function test_expired_at2_with_no_answers_is_auto_submitted_without_fabricating_answers(): void
+    {
+        [, , $pendaftaran] = $this->baseWorkflow('asesmen_tahap2');
+        [$uji, $first, $second] = $this->expiredWrittenAt2($pendaftaran);
+
+        $result = app(At2ExpiredAutoSubmitService::class)->finalizeExpired();
+
+        $this->assertSame(1, $result['processed']);
+        $this->assertSame('koreksi', $uji->fresh()->fase_tulis);
+        $this->assertNull($first->fresh()->jawaban_pemohon);
+        $this->assertNull($second->fresh()->jawaban_pemohon);
+    }
+
+    public function test_auto_submit_skips_already_finalized_at2_sessions(): void
+    {
+        [, , $pendaftaran] = $this->baseWorkflow('asesmen_tahap2');
+        [$uji] = $this->expiredWrittenAt2($pendaftaran, ['fase_tulis' => 'koreksi']);
+
+        $result = app(At2ExpiredAutoSubmitService::class)->finalizeExpired();
+
+        $this->assertSame(0, $result['processed']);
+        $this->assertSame('koreksi', $uji->fresh()->fase_tulis);
+    }
+
+    public function test_manual_submit_before_timeout_still_requires_all_written_questions(): void
+    {
+        [, , $pendaftaran, , $pemohon] = $this->baseWorkflow('asesmen_tahap2');
+        [$uji, $answered] = $this->activeWrittenAt2($pendaftaran);
+        $controller = app(PemohonUjiLanjutanController::class);
+
+        try {
+            $controller->submitJawaban(
+                $this->requestAs($pemohon, [
+                    'jawaban' => [[
+                        'id' => $answered->id,
+                        'jawaban_pemohon' => 'Hanya satu jawaban',
+                    ]],
+                ]),
+                $uji->id,
+            );
+            $this->fail('Submit manual belum lengkap seharusnya ditolak.');
+        } catch (HttpException $e) {
+            $this->assertSame(422, $e->getStatusCode());
+        }
+
+        $this->assertSame('menunggu_jawaban', $uji->fresh()->fase_tulis);
+    }
+
+    public function test_manual_submit_after_timeout_is_rejected_and_timeout_endpoint_finalizes(): void
+    {
+        [, , $pendaftaran, , $pemohon] = $this->baseWorkflow('asesmen_tahap2');
+        [$uji, $answered] = $this->expiredWrittenAt2($pendaftaran);
+        $controller = app(PemohonUjiLanjutanController::class);
+
+        try {
+            $controller->submitJawaban(
+                $this->requestAs($pemohon, [
+                    'jawaban' => [[
+                        'id' => $answered->id,
+                        'jawaban_pemohon' => 'Jawaban terlambat',
+                    ]],
+                ]),
+                $uji->id,
+            );
+            $this->fail('Submit manual setelah timeout seharusnya ditolak.');
+        } catch (HttpException $e) {
+            $this->assertSame(409, $e->getStatusCode());
+        }
+
+        $response = $controller->timeoutSubmit(
+            $this->requestAs($pemohon),
+            $uji->id,
+            app(At2ExpiredAutoSubmitService::class),
+        );
+
+        $this->assertSame(200, $response->status());
+        $this->assertSame('koreksi', $uji->fresh()->fase_tulis);
     }
 
     public function test_duplicate_reschedule_requests_are_rejected(): void
@@ -517,6 +613,47 @@ class PhaseOneRemediationFeatureTest extends TestCase
             'keputusan_final' => 'A',
             'status' => 'aman',
         ]);
+    }
+
+    private function expiredWrittenAt2(Pendaftaran $pendaftaran, array $overrides = []): array
+    {
+        return $this->writtenAt2($pendaftaran, array_merge([
+            'fase_tulis' => 'menunggu_jawaban',
+            'durasi_menit' => 30,
+            'ujian_dimulai_at' => now()->subMinutes(31),
+        ], $overrides));
+    }
+
+    private function activeWrittenAt2(Pendaftaran $pendaftaran, array $overrides = []): array
+    {
+        return $this->writtenAt2($pendaftaran, array_merge([
+            'fase_tulis' => 'menunggu_jawaban',
+            'durasi_menit' => 30,
+            'ujian_dimulai_at' => now()->subMinutes(5),
+        ], $overrides));
+    }
+
+    private function writtenAt2(Pendaftaran $pendaftaran, array $overrides = []): array
+    {
+        $uji = UjiLanjutan::create(array_merge([
+            'pendaftaran_id' => $pendaftaran->id,
+            'status' => 'menunggu_ujian',
+            'fase_tulis' => 'menunggu_jawaban',
+            'durasi_menit' => 30,
+            'ujian_dimulai_at' => now(),
+        ], $overrides));
+        $first = UjiLanjutanItem::create([
+            'uji_lanjutan_id' => $uji->id,
+            'tipe' => 'c3',
+            'pertanyaan_instruksi' => 'Pertanyaan pertama',
+        ]);
+        $second = UjiLanjutanItem::create([
+            'uji_lanjutan_id' => $uji->id,
+            'tipe' => 'c3',
+            'pertanyaan_instruksi' => 'Pertanyaan kedua',
+        ]);
+
+        return [$uji, $first, $second];
     }
 
     private function user(string $role, ?int $prodiId = null): User

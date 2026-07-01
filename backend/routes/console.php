@@ -12,6 +12,7 @@ Artisan::command('inspire', function () {
 // Jalankan: php artisan schedule:run (atau setup cron di production)
 Schedule::command('sanctum:prune-expired --hours=8')->daily();
 Schedule::command('queue:health')->everyMinute()->withoutOverlapping();
+Schedule::command('at2:auto-submit-expired')->everyMinute()->withoutOverlapping();
 Schedule::command('sk:materialize-published')->everyTenMinutes()->withoutOverlapping();
 Schedule::command('cache:prune-expired --execute')->daily()->withoutOverlapping();
 Schedule::command('notifications:prune-read --execute')->dailyAt('01:30')->withoutOverlapping();

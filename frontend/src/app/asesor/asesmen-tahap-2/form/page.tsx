@@ -1301,10 +1301,12 @@ function UjiLanjutanFormContent() {
                           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">{group.tipe === "c3" ? `Soal ${si + 1}` : group.tipe === "c2" ? `Poin Klarifikasi ${si + 1}` : `Pertanyaan/Instruksi ${si + 1}`}</p>
                           <p className="text-sm font-medium text-foreground">{soal.pertanyaan_instruksi}</p>
                         </div>
-                        {group.tipe === "c3" && soal.jawaban_pemohon && (
+                        {group.tipe === "c3" && (
                           <div className="space-y-1">
                             <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Jawaban Pemohon</p>
-                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm text-foreground leading-relaxed">{soal.jawaban_pemohon}</div>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm text-foreground leading-relaxed">
+                              {soal.jawaban_pemohon || <span className="italic text-muted-foreground">Tidak dijawab</span>}
+                            </div>
                           </div>
                         )}
                         {group.tipe === "c3" && soal.kunci_jawaban && (
